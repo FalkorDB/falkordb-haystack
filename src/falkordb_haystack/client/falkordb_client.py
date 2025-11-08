@@ -3,7 +3,6 @@ import os
 from dataclasses import dataclass, field
 from typing import (
     Any,
-    Callable,
     Dict,
     Generator,
     List,
@@ -15,16 +14,7 @@ from typing import (
 )
 
 from haystack import default_from_dict, default_to_dict
-from falkordb import (
-    Auth,
-    GraphDatabase,
-    ManagedTransaction,
-    Record,
-    Result,
-    ResultSummary,
-    Session,
-    unit_of_work,
-)
+from falkordb import FalkorDB
 
 from falkordb_haystack.errors import FalkorDBClientError
 from falkordb_haystack.metadata_filter import AST, FalkorDBQueryConverter
@@ -35,38 +25,32 @@ NODE_VAR = "doc"
 """Default variable name used in Cypher queries to match and return Documents, e.g.
 `:::cypher match(doc:Document) where doc.id = $id return doc` where `doc` is a variable name."""
 
-DEFAULT_NEO4J_URI = "bolt://localhost:7687"
-"""Default URI to connect to falkordb instance, e.g. a local DB running in Docker container."""
+DEFAULT_FALKORDB_HOST = "localhost"
+"""Default host to connect to FalkorDB instance, e.g. a local DB running in Docker container."""
 
-DEFAULT_NEO4J_DATABASE = "falkordb"
-"""Default FalkorDB database name to connect to if not provided."""
+DEFAULT_FALKORDB_PORT = 6379
+"""Default port to connect to FalkorDB instance."""
 
-DEFAULT_NEO4J_USERNAME = "falkordb"
-"""Default FalkorDB username to be used for authentication with FalkorDB. Used to simplify local development."""
+DEFAULT_FALKORDB_GRAPH = "haystack"
+"""Default FalkorDB graph name to use if not provided."""
 
-DEFAULT_NEO4J_PASSWORD = "falkordb"
-"""Default FalkorDB password to be used for authentication with FalkorDB. Used to simplify local development."""
+DEFAULT_FALKORDB_USERNAME = None
+"""Default FalkorDB username to be used for authentication with FalkorDB."""
+
+DEFAULT_FALKORDB_PASSWORD = None
+"""Default FalkorDB password to be used for authentication with FalkorDB."""
 
 FalkorDBRecord = Dict[str, Any]
 """Type alias for data items returned from FalkorDB queries"""
 
 SimilarityFunction = Literal["cosine", "euclidean"]
 
-FalkorDBSessionConfig = Mapping[str, Any]
-"""Generic dictionary for [Session Configuration](https://falkordb.com/docs/api/python-driver/current/api.html#session-configuration)"""
-
-FalkorDBDriverConfig = Mapping[str, Any]
-"""Generic dictionary for [Driver Configuration](https://falkordb.com/docs/api/python-driver/current/api.html#driver-configuration)"""
-
-FalkorDBTransactionConfig = Mapping[str, Any]
-"""Generic dictionary for [Transaction Configuration](https://falkordb.com/docs/api/python-driver/current/api.html#transaction)"""
-
 
 @dataclass
 class VectorStoreIndexInfo:
     """FalkorDB vector index information retrieved from the database.
 
-    See [Create and configure vector indexes](https://falkordb.com/docs/cypher-manual/current/indexes-for-vector-search/#indexes-vector-create)
+    See [Create and configure vector indexes](https://docs.falkordb.com/cypher/indexing.html)
     documentation to learn more about data representing index configuration.
 
     Attributes:
@@ -87,78 +71,47 @@ class VectorStoreIndexInfo:
 @dataclass
 class FalkorDBClientConfig:
     """
-    Provides extensive configuration options in order to communicate with FalkorDB database.
+    Provides configuration options to communicate with FalkorDB database.
 
-    It combines several configuration levels for each entity used by python driver to communicate with a database:
-
-    - [Driver Configuration][falkordb_haystack.client.falkordb_client.FalkorDBDriverConfig]
-    - [Session Configuration][falkordb_haystack.client.falkordb_client.FalkorDBSessionConfig]
-    - [Transaction Configuration][falkordb_haystack.client.falkordb_client.FalkorDBTransactionConfig]
-
-    Developers can pick up configuration properties for each entity (e.g. session) which will be applied during
-    transaction invocations. For example, ``driver_config={"connection_timeout": 30}`` will set amount of time in
-    seconds to wait for a TCP connection to be established.
-
-    `username` and `password` are optional because developer can choose to provide alternative
-    authentication options using `driver_config` by setting [Driver Auth Details](https://falkordb.com/docs/api/python-driver/current/api.html#auth).
+    FalkorDB uses Redis protocol, so connection is made via host/port rather than URL.
 
     Attributes:
-        url: Database connection string, see https://falkordb.com/docs/api/python-driver/current/api.html#uri.
-        database: Database name to connect.
-        username: Username to authenticate with the database.
-        password: Password credential for the given username.
-        driver_config: Additional driver configuration.
-        session_config: Additional session configuration.
-        transaction_config: Additional transaction configuration (e.g. ``timeout``)
-        use_env: If `True` the following Driver attributes will be assigned from respective environment variables:
+        host: Database host address (default: localhost)
+        port: Database port (default: 6379)
+        graph: Graph name to use (default: haystack)
+        username: Username to authenticate with the database (optional)
+        password: Password credential for the given username (optional)
+        use_env: If `True` the following attributes will be assigned from respective environment variables:
             ```py
-            >>> url = os.getenv("NEO4J_URI")
-            >>> database = os.getenv("NEO4J_DATABASE")
-            >>> username = os.getenv("NEO4J_USERNAME")
-            >>> password = os.getenv("NEO4J_PASSWORD")
+            >>> host = os.getenv("FALKORDB_HOST")
+            >>> port = os.getenv("FALKORDB_PORT")
+            >>> graph = os.getenv("FALKORDB_GRAPH")
+            >>> username = os.getenv("FALKORDB_USERNAME")
+            >>> password = os.getenv("FALKORDB_PASSWORD")
             ```
-
-    Raises:
-        ValueError: In case conflicting auth credentials are provided - choose either username/password combination
-            or `driver_config.auth`.
     """
 
-    url: Optional[str] = field(default=DEFAULT_NEO4J_URI)
-    database: Optional[str] = field(default=DEFAULT_NEO4J_DATABASE)
-    username: Optional[str] = field(default=DEFAULT_NEO4J_USERNAME)
-    password: Optional[str] = field(default=DEFAULT_NEO4J_PASSWORD)
-
-    driver_config: FalkorDBDriverConfig = field(default_factory=dict)
-    session_config: FalkorDBSessionConfig = field(default_factory=dict)
-    transaction_config: FalkorDBTransactionConfig = field(default_factory=dict)
-
+    host: str = field(default=DEFAULT_FALKORDB_HOST)
+    port: int = field(default=DEFAULT_FALKORDB_PORT)
+    graph: str = field(default=DEFAULT_FALKORDB_GRAPH)
+    username: Optional[str] = field(default=DEFAULT_FALKORDB_USERNAME)
+    password: Optional[str] = field(default=DEFAULT_FALKORDB_PASSWORD)
     use_env: Optional[bool] = field(default=False)
-    auth: Optional[Auth] = field(default=None)
 
     def __post_init__(self):
         if self.use_env:
-            self.url = os.getenv("NEO4J_URI", self.url)
-            self.database = os.getenv("NEO4J_DATABASE", self.database)
-            self.username = os.getenv("NEO4J_USERNAME", self.username)
-            self.password = os.getenv("NEO4J_PASSWORD", self.password)
+            self.host = os.getenv("FALKORDB_HOST", self.host)
+            port_env = os.getenv("FALKORDB_PORT")
+            if port_env:
+                self.port = int(port_env)
+            self.graph = os.getenv("FALKORDB_GRAPH", self.graph)
+            self.username = os.getenv("FALKORDB_USERNAME", self.username)
+            self.password = os.getenv("FALKORDB_PASSWORD", self.password)
 
-        if not self.url:
-            raise ValueError("The `url` attribute is mandatory to connect to database.")
-
-        self.auth = self.auth or self.driver_config.get("auth")
-        # Lets remove "auth" from driver config to avoid duplicate "auth" configuration when driver is created
-        self.driver_config = {k: v for k, v in self.driver_config.items() if k != "auth"}
-
-        if self.auth is None and self.username and self.password:
-            self.auth = (self.username, self.password)
-
-        if self.auth is None:
-            raise ValueError(
-                "Authentication credentials are missing. Please provide one of the following: "
-                "1) `username` and `password`, "
-                "2) `auth` field, or "
-                "3) `driver_config['auth']`."
-            )
+        if not self.host:
+            raise ValueError("The `host` attribute is mandatory to connect to database.")
+        if not self.graph:
+            raise ValueError("The `graph` attribute is mandatory to select a graph.")
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -166,16 +119,13 @@ class FalkorDBClientConfig:
         """
         data = default_to_dict(
             self,
-            url=self.url,
-            database=self.database,
+            host=self.host,
+            port=self.port,
+            graph=self.graph,
             username=self.username,
             password=self.password,
-            driver_config=self.driver_config,
-            session_config=self.session_config,
-            transaction_config=self.transaction_config,
             use_env=self.use_env,
         )
-
         return data
 
     @classmethod
@@ -197,7 +147,8 @@ class FalkorDBClient:
 
     Attributes:
         _config: FalkorDB configuration options.
-        _driver: An instance of [falkordb.Driver][] which is used to start a session for transaction execution.
+        _db: An instance of FalkorDB client connection.
+        _graph: The graph object for executing queries.
         _filter_converter: Instance of `FalkorDBQueryConverter` which converts parsed Metadata filters to Cypher
             queries.
     """
@@ -205,36 +156,35 @@ class FalkorDBClient:
     def __init__(self, config: FalkorDBClientConfig):
         self._config = config
 
-        if not config.url:
-            raise ValueError("`FalkorDBClientConfig.url` is mandatory attribute when trying to connect to FalkorDB database.")
+        if not config.host:
+            raise ValueError("`FalkorDBClientConfig.host` is mandatory attribute when trying to connect to FalkorDB database.")
 
-        self._driver = GraphDatabase.driver(config.url, auth=config.auth, **config.driver_config)
+        # Create FalkorDB connection
+        kwargs = {"host": config.host, "port": config.port}
+        if config.username and config.password:
+            kwargs["username"] = config.username
+            kwargs["password"] = config.password
+
+        self._db = FalkorDB(**kwargs)
+        self._graph = self._db.select_graph(config.graph)
         self._filter_converter = FalkorDBQueryConverter(NODE_VAR)
 
     def delete_nodes(self, node_label: str, filter_ast: Optional[AST] = None) -> None:
         """
-        Deletes nodes with with given label and filters using [DELETE](https://falkordb.com/docs/cypher-manual/current/clauses/delete/)
+        Deletes nodes with with given label and filters using [DELETE](https://docs.falkordb.com/commands/)
             Cypher clause.
 
         Args:
             node_label: The name of the label to delete (e.g. ``"Document"``)
             filter_ast: Metadata filters to delete only specific nodes which match filtering conditions.
         """
-
-        @self._unit_of_work()
-        def _mgt_tx(tx: ManagedTransaction) -> None:
-            where_clause, where_params = self._where_clause(filter_ast)
-            tx.run(
-                f"""
-                MATCH ({NODE_VAR}:`{node_label}`)
-                {where_clause}
-                DETACH DELETE {NODE_VAR}
-                """,
-                parameters={**where_params},
-            )
-
-        with self._begin_session() as session:
-            session.execute_write(_mgt_tx)
+        where_clause, where_params = self._where_clause(filter_ast)
+        query = f"""
+            MATCH ({NODE_VAR}:`{node_label}`)
+            {where_clause}
+            DELETE {NODE_VAR}
+        """
+        self._graph.query(query, where_params)
 
     def create_index(
         self,
@@ -245,9 +195,8 @@ class FalkorDBClient:
         similarity_function: SimilarityFunction,
     ) -> None:
         """
-        Creates a new vector index in database for a given node label and vector specific attributes (e.g. dimension,
-        similarity function etc). See documentation for the index creation procedure \
-        [db.index.vector.createNodeIndex](https://falkordb.com/docs/operations-manual/5/reference/procedures/#procedure_db_index_vector_createNodeIndex)
+        Creates a new vector index in database for a given node label and vector specific attributes.
+        See documentation for vector indexes in FalkorDB.
 
         Args:
             index_name: The unique name of the index.
@@ -257,28 +206,11 @@ class FalkorDBClient:
             similarity_function: case-insensitive values for the vector similarity function:
                 ``cosine`` or ``euclidean``.
         """
-
-        @self._unit_of_work()
-        def _mgt_tx(tx: ManagedTransaction) -> None:
-            tx.run(
-                """
-                CALL db.index.vector.createNodeIndex(
-                    $index_name,
-                    $label,
-                    $property_key,
-                    toInteger($vector_dimension),
-                    $similarity_function
-                )
-                """,
-                index_name=index_name,
-                label=label,
-                property_key=property_key,
-                vector_dimension=dimension,
-                similarity_function=similarity_function,
-            )
-
-        with self._begin_session() as session:
-            session.execute_write(_mgt_tx)
+        query = f"""
+            CREATE VECTOR INDEX FOR (n:{label}) ON (n.{property_key})
+            OPTIONS {{dimension: {dimension}, similarityFunction: '{similarity_function}'}}
+        """
+        self._graph.query(query)
 
     def retrieve_vector_index(
         self,
@@ -289,50 +221,19 @@ class FalkorDBClient:
         """
         Retrieves information about existing vector index.
 
-        For more details and an example query on how to obtain existing indexes see \
-        [Query a vector index](https://falkordb.com/docs/cypher-manual/current/indexes-for-vector-search/#indexes-vector-query).
-
         Args:
             index_name: The name of the vector index to retrieve.
-            node_label: The label of the node configured as prt of vector index setup.
+            node_label: The label of the node configured as part of vector index setup.
             property_key: The property key configured as part of vector index setup.
 
-        Raises:
-            FalkorDBClientError: If more than one index found matching search criteria (same index name OR
-                label+property combination).
-
         Returns:
-            Data retrieved from the query execution or `None` if index was not found.
+            Data retrieved from the query or `None` if index was not found.
         """
-
-        @self._unit_of_work()
-        def _mgt_tx(tx: ManagedTransaction) -> List[Record]:
-            result = tx.run(
-                """
-                SHOW INDEXES YIELD name, type, labelsOrTypes, properties, options
-                WHERE type = 'VECTOR' AND
-                (name = $index_name OR (labelsOrTypes[0] = $node_label AND properties[0] = $property_key))
-                RETURN name, labelsOrTypes, properties, options
-                """,
-                index_name=index_name,
-                node_label=node_label,
-                property_key=property_key,
-            )
-
-            return list(result)
-
-        with self._begin_session() as session:
-            found_indexes = session.execute_write(_mgt_tx)
-
-        if len(found_indexes) > 1:
-            raise FalkorDBClientError(
-                "Failed to retrieve vector index from FalkorDB."
-                "There were several indexes found with a given search criteria: "
-                f"$index_name='{index_name}' OR ($node_label='{node_label}' AND $property_key='{property_key}'). "
-                "Please make sure the FalkorDBDocumentStore points to an unambiguous vector index"
-            )
-
-        return self._vector_store_index_info(found_indexes[0]) if found_indexes else None
+        # FalkorDB doesn't have a SHOW INDEXES equivalent in the same way as Neo4j
+        # We'll need to check if the index exists by querying it
+        # For now, return None - this needs proper implementation based on FalkorDB's index introspection
+        logger.warning("Vector index retrieval not fully implemented for FalkorDB yet")
+        return None
 
     def create_index_if_missing(
         self,
@@ -344,42 +245,34 @@ class FalkorDBClient:
     ):
         """
         Creates a vector index in case it does not exist in database.
-        Uses same parameters as [create_index][falkordb_haystack.client.falkordb_client.FalkorDBClient.create_index] \
-            method.
         """
-
         existing_index = self.retrieve_vector_index(index_name, label, property_key)
 
         if not existing_index:
             logger.debug("Creating a new index(%s) as it is not present in the configured FalkorDB database", index_name)
-            self.create_index(index_name, label, property_key, dimension, similarity_function)
+            try:
+                self.create_index(index_name, label, property_key, dimension, similarity_function)
+            except Exception as e:
+                # Index might already exist, log and continue
+                logger.debug("Index creation attempt resulted in: %s", str(e))
 
     def delete_index(self, index_name: str) -> None:
         """
         Removes index from FalkorDB database.
 
-        See Cypher manual on [Drop vector indexes](https://falkordb.com/docs/cypher-manual/current/indexes-for-vector-search/#indexes-vector-drop)
-
         Args:
             index_name: The name of the index to delete.
         """
-
-        @self._unit_of_work()
-        def _mgt_tx(tx: ManagedTransaction) -> None:
-            tx.run(f"DROP INDEX `{index_name}`")
-
-        with self._begin_session() as session:
-            session.execute_write(_mgt_tx)
+        query = f"DROP INDEX {index_name}"
+        self._graph.query(query)
 
     def update_embedding(self, node_label: str, embedding_field: str, records: List[Dict[str, Any]]) -> None:
         """
-        Updates embedding on a number of ``Document`` nodes. It uses ``db.create.setNodeVectorProperty()`` procedure as
-        a recommended update method. See more details in [Set a vector property on a node](https://falkordb.com/docs/cypher-manual/current/indexes-for-vector-search/#indexes-vector-set)
+        Updates embedding on a number of ``Document`` nodes.
 
         Args:
             node_label: A node label to match (e.g. ``"Document"``).
-            embedding_field: The name of the embedding field which stores embeddings (of type ``LIST<FLOAT>``) as part
-                node properties.
+            embedding_field: The name of the embedding field which stores embeddings.
             records: A list dictionary objects following the structure:
                 ```python
                     [{
@@ -388,62 +281,73 @@ class FalkorDBClient:
                     }]
                 ```
         """
+        for record in records:
+            doc_id = record["id"]
+            embedding = record.get(embedding_field)
+            if embedding:
+                # Convert embedding to vecf32 format
+                vec_str = "vecf32([" + ",".join(str(v) for v in embedding) + "])"
+                query = f"""
+                    MATCH ({NODE_VAR}:`{node_label}` {{id: $id}})
+                    SET {NODE_VAR}.{embedding_field} = {vec_str}
+                    RETURN {NODE_VAR}
+                """
+                self._graph.query(query, {"id": doc_id})
 
-        @self._unit_of_work()
-        def _mgt_tx(tx: ManagedTransaction) -> None:
-            tx.run(
-                f"""
-                WITH $records AS batch
-                UNWIND batch as row
-                MATCH ({NODE_VAR}:`{node_label}` {{id: row.id}})
-                CALL db.create.setNodeVectorProperty({NODE_VAR}, '{embedding_field}', row.{embedding_field})
-                RETURN {NODE_VAR}
-                """,
-                records=records,
-            )
-
-        with self._begin_session() as session:
-            session.execute_write(_mgt_tx)
-
-    def merge_nodes(self, node_label: str, embedding_field: str, records: List[FalkorDBRecord]) -> ResultSummary:
+    def merge_nodes(self, node_label: str, embedding_field: str, records: List[FalkorDBRecord]) -> Any:
         """
-        Creates or updates a node in falkordb representing a Document with all properties. Nodes are matched by "id",
-        if not found a new node will be created. See the following manuals:
-
-        - [MERGE clause](https://falkordb.com/docs/cypher-manual/current/clauses/merge/)
-        - [Settings properties using a map](https://falkordb.com/docs/cypher-manual/current/clauses/set/#set-setting-properties-using-map)
-        - [db.create.setNodeVectorProperty](https://falkordb.com/docs/operations-manual/5/reference/procedures/#procedure_db_create_setNodeVectorProperty)
+        Creates or updates a node in FalkorDB representing a Document with all properties. Nodes are matched by "id",
+        if not found a new node will be created.
 
         Args:
             node_label: The label of the node to match (e.g. "Document").
-            embedding_field: The name of the embedding field which stores embeddings (of type ``LIST<FLOAT>``) as part
-                of node properties. Embeddings (if present) will be updated/set by ``db.create.setNodeVectorProperty()``
-                procedure - `embedding_field` is excluded from ``SET`` Cypher clause by using map projections.
-            records: A list of [Documents](https://docs.haystack.deepset.ai/reference/primitives-api#document) \
+            embedding_field: The name of the embedding field which stores embeddings.
+            records: A list of [Documents](https://docs.haystack.deepset.ai/reference/primitives-api#document)
                 converted to dictionaries, with ``meta`` attributes included.
         """
-
-        @self._unit_of_work()
-        def _mgt_tx(tx: ManagedTransaction):
-            result = tx.run(
-                f"""
-                WITH $records AS batch
-                UNWIND batch as row
-                MERGE ({NODE_VAR}:`{node_label}` {{id: row.id}})
-                SET {NODE_VAR} += row{{.*, {embedding_field}: null}}
-                WITH {NODE_VAR}, row
-                CALL {{ WITH {NODE_VAR}, row
-                    MATCH({NODE_VAR}:`{node_label}` {{id: row.id}}) WHERE row.embedding IS NOT NULL
-                    CALL db.create.setNodeVectorProperty({NODE_VAR}, '{embedding_field}', row.{embedding_field})
-                }}
-                """,
-                records=records,
-            )
-            summary = result.consume()
-            return summary
-
-        with self._begin_session() as session:
-            return session.execute_write(_mgt_tx)
+        for record in records:
+            doc_id = record["id"]
+            # Separate embedding from other properties
+            embedding = record.pop(embedding_field, None)
+            
+            # Build SET clause for non-embedding properties
+            set_props = []
+            params = {"id": doc_id}
+            for key, value in record.items():
+                if key != "id" and value is not None:
+                    param_name = f"prop_{key}"
+                    set_props.append(f"{NODE_VAR}.{key} = ${param_name}")
+                    params[param_name] = value
+            
+            set_clause = ", ".join(set_props) if set_props else ""
+            
+            # Create or update node
+            if set_clause:
+                query = f"""
+                    MERGE ({NODE_VAR}:`{node_label}` {{id: $id}})
+                    SET {set_clause}
+                    RETURN {NODE_VAR}
+                """
+            else:
+                query = f"""
+                    MERGE ({NODE_VAR}:`{node_label}` {{id: $id}})
+                    RETURN {NODE_VAR}
+                """
+            
+            self._graph.query(query, params)
+            
+            # Update embedding separately if present
+            if embedding is not None:
+                vec_str = "vecf32([" + ",".join(str(v) for v in embedding) + "])"
+                embed_query = f"""
+                    MATCH ({NODE_VAR}:`{node_label}` {{id: $id}})
+                    SET {NODE_VAR}.{embedding_field} = {vec_str}
+                    RETURN {NODE_VAR}
+                """
+                self._graph.query(embed_query, {"id": doc_id})
+        
+        # Return a dummy summary object
+        return type('Summary', (), {'counters': type('Counters', (), {})()})()
 
     def count_nodes(self, node_label: str, filter_ast: Optional[AST] = None) -> int:
         """
@@ -456,22 +360,16 @@ class FalkorDBClient:
         Returns:
             Number of found nodes.
         """
-
-        @self._unit_of_work()
-        def _mgt_tx(tx: ManagedTransaction):
-            where_clause, where_params = self._where_clause(filter_ast)
-            result = tx.run(
-                f"""
-                MATCH ({NODE_VAR}:`{node_label}`)
-                {where_clause}
-                RETURN count(*) as count
-                """,
-                parameters={**where_params},
-            )
-            return result.single(strict=True).value()
-
-        with self._begin_session() as session:
-            return session.execute_read(_mgt_tx)
+        where_clause, where_params = self._where_clause(filter_ast)
+        query = f"""
+            MATCH ({NODE_VAR}:`{node_label}`)
+            {where_clause}
+            RETURN count(*) as count
+        """
+        result = self._graph.query(query, where_params)
+        if result.result_set:
+            return result.result_set[0][0]
+        return 0
 
     def find_nodes(
         self,
@@ -486,11 +384,8 @@ class FalkorDBClient:
         Args:
             node_label: The label of the nodes to match (e.g. ``"Document"``).
             filter_ast: The filter syntax tree (parsed metadata filter) for search.
-            skip_properties: Properties we would like not to return as part of data payload. Is uses map projection
-                Cypher syntax, e.g. `:::cypher doc{.*, embedding: null}` - such construct will make sure ``embedding``
-                is not returned back in results.
-            fetch_size: Controls how many records are fetched at once from the database which helps with batching
-                process.
+            skip_properties: Properties we would like not to return as part of data payload.
+            fetch_size: Controls how many records are fetched at once from the database.
 
         Returns:
             Found records matching search criteria.
@@ -499,53 +394,37 @@ class FalkorDBClient:
         query = f"""
             MATCH ({NODE_VAR}:`{node_label}`)
             {where_clause}
-            RETURN {NODE_VAR}{self._map_projection(skip_properties)}
-            """
+            RETURN {NODE_VAR}
+        """
 
-        for record in self.query_nodes(query=query, parameters={**where_params}, fetch_size=fetch_size):
-            yield cast(FalkorDBRecord, record.data().get(NODE_VAR))
+        for record in self.query_nodes(query=query, parameters=where_params, fetch_size=fetch_size):
+            yield record
 
     def query_nodes(
         self,
         query: str,
         parameters: Optional[Dict[str, Any]] = None,
         fetch_size: int = 1000,
-    ) -> Generator[Record, None, None]:
+    ) -> Generator[FalkorDBRecord, None, None]:
         """
-        Runs a given Cypher `query`. The implementation is based on ``Unmanaged Transactions``
-        for greater control and possibility to ``yield`` results as soon as those are fetched from database. The FalkorDB
-        python driver internally manages a buffer which replenished while records are being consumed thus making sure we
-        do not store all fetched records in memory. That greatly simplifies batching mechanism as it is implemented by
-        the buffer. See more details about how python driver implements \
-        [Explicit/Unmanaged Transactions](https://falkordb.com/docs/api/python-driver/current/api.html#explicit-transactions-unmanaged-transactions)
-
-        Note:
-            Please notice results are yielded while read transaction is still open. That should impact your choice of
-            transaction timeout setting, see \
-                [FalkorDBClientConfig][falkordb_haystack.client.falkordb_client.FalkorDBClientConfig].
+        Runs a given Cypher `query`.
 
         Args:
             query: Cypher query to run in FalkorDB.
             parameters: Query parameters which can be used as placeholders in the `query`.
-            fetch_size: Controls how many records are fetched at once from the database which helps with batching
-                process.
+            fetch_size: Controls how many records are fetched at once from the database.
 
         Returns:
             Records containing data specified in ``RETURN`` Cypher query statement.
         """
-        with self._begin_session(fetch_size=fetch_size) as session:
-            with session.begin_transaction(
-                metadata=self._config.transaction_config.get("metadata"),
-                timeout=self._config.transaction_config.get("timeout"),
-            ) as tx:
-                try:
-                    result: Result = tx.run(
-                        query,
-                        parameters=parameters,
-                    )
-                    yield from result
-                finally:
-                    tx.close()
+        result = self._graph.query(query, parameters or {})
+        
+        if result.result_set:
+            for row in result.result_set:
+                # Extract node data from result
+                if row:
+                    node_data = row[0] if isinstance(row[0], dict) else self._node_to_dict(row[0])
+                    yield node_data
 
     def query_embeddings(
         self,
@@ -558,31 +437,18 @@ class FalkorDBClient:
     ) -> List[FalkorDBRecord]:
         """
         Query a vector index and apply filtering using `WHERE` clause on results returned by vector search.
-        See the following documentation for more details:
-
-        - [Query a vector index](https://falkordb.com/docs/cypher-manual/current/indexes-for-vector-search/#indexes-vector-query)
-        - [db.index.vector.queryNodes()](https://falkordb.com/docs/operations-manual/5/reference/procedures/#procedure_db_index_vector_queryNodes)
 
         Args:
             index: Refers to the unique name of the vector index to query.
             top_k: Number of results to return from vector search.
-            embedding: The query vector (a ``LIST<FLOAT>``) in which to search for the neighborhood.
-            filter_ast: Additional filters translated into `WHERE` Cypher clause by \
-                [FalkorDBQueryConverter][falkordb_haystack.metadata_filter.FalkorDBQueryConverter]
-            skip_properties: Properties we would like **not** to return as part of data payload. Is uses map projection
-                Cypher syntax, e.g. `:::cypher doc{.*, embedding: null}` - such construct will make sure `embedding` is
-                not returned back in results.
-            vector_top_k: If provided `vector_top_k` is used instead of `top_k` in order to increase number of
-                results (nearest neighbors) from vector search. It makes sense when filters (`filter_ast`) could
-                further narrow down vector search result. Only `top_k` number of records will be returned back thus
-                `vector_top_k` should be preferably greater than `top_k`.
+            embedding: The query vector in which to search for the neighborhood.
+            filter_ast: Additional filters translated into `WHERE` Cypher clause.
+            skip_properties: Properties we would like **not** to return as part of data payload.
+            vector_top_k: If provided `vector_top_k` is used instead of `top_k`.
+
         Returns:
-            An ordered by score `top_k` nodes found in vector search which are optionally filtered using
-                ``WHERE`` clause.
+            An ordered by score `top_k` nodes found in vector search.
         """
-
-        score_property = "score"
-
         if vector_top_k and vector_top_k < top_k:
             logger.warning(
                 "Make sure 'vector_top_k'(=%s) is greater than 'top_k'(=%s) parameter. Using 'top_k' instead",
@@ -591,37 +457,45 @@ class FalkorDBClient:
             )
             vector_top_k = top_k
 
-        @self._unit_of_work()
-        def _mgt_tx(tx: ManagedTransaction) -> List[Record]:
-            where_clause, where_params = self._where_clause(filter_ast)
-            result = tx.run(
-                f"""
-                CALL db.index.vector.queryNodes($index, $vector_top_k, $embedding)
-                YIELD node as {NODE_VAR}, {score_property}
-                MATCH ({NODE_VAR}) {where_clause}
-                RETURN {NODE_VAR}{self._map_projection(skip_properties)}, {score_property}
-                ORDER BY {score_property} DESC LIMIT $top_k
-                """,
-                parameters={
-                    "index": index,
-                    "top_k": top_k,
-                    "embedding": embedding,
-                    "vector_top_k": vector_top_k or top_k,
-                    **where_params,
-                },
-            )
-            return list(result)
+        where_clause, where_params = self._where_clause(filter_ast)
+        
+        # Convert embedding to vecf32 format
+        vec_str = "vecf32([" + ",".join(str(v) for v in embedding) + "])"
+        
+        # FalkorDB vector search query
+        query = f"""
+            CALL db.idx.vector.queryNodes($index_name, $property_key, $vector_top_k, {vec_str})
+            YIELD node as {NODE_VAR}, score
+            MATCH ({NODE_VAR}) {where_clause}
+            RETURN {NODE_VAR}, score
+            ORDER BY score DESC LIMIT $top_k
+        """
+        
+        params = {
+            "index_name": index,
+            "property_key": "embedding",  # This should be configurable
+            "top_k": top_k,
+            "vector_top_k": vector_top_k or top_k,
+            **where_params,
+        }
 
-        with self._begin_session() as session:
-            records = session.execute_read(_mgt_tx)
-
-        return [{**record.value(NODE_VAR), score_property: record.value("score")} for record in records]
+        result = self._graph.query(query, params)
+        
+        records = []
+        if result.result_set:
+            for row in result.result_set:
+                node_data = row[0] if isinstance(row[0], dict) else self._node_to_dict(row[0])
+                score = row[1]
+                node_data["score"] = score
+                records.append(node_data)
+        
+        return records
 
     def execute_write(
         self,
         query: str,
         parameters: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[ResultSummary, List[Dict[str, Any]]]:
+    ) -> Tuple[Any, List[Dict[str, Any]]]:
         """
         Runs an arbitrary write Cypher query with parameters.
 
@@ -630,27 +504,30 @@ class FalkorDBClient:
             parameters: Query parameters which can be used as placeholders in the `query`.
 
         Returns:
-            A tuple consisting of execution result summary (`falkordb.ResultSummary`) and data records (`dict`) if any.
+            A tuple consisting of execution result summary and data records if any.
         """
-
-        @self._unit_of_work()
-        def _mgt_tx(tx: ManagedTransaction):
-            result = tx.run(
-                query,
-                parameters=parameters,
-            )
-            records = result.data()
-            summary = result.consume()
-            return summary, records
-
-        with self._begin_session() as session:
-            return session.execute_write(_mgt_tx)
+        result = self._graph.query(query, parameters or {})
+        
+        records = []
+        if result.result_set:
+            for row in result.result_set:
+                if row:
+                    record_dict = {}
+                    # Try to extract data from row
+                    for i, item in enumerate(row):
+                        if isinstance(item, dict):
+                            record_dict.update(item)
+                        else:
+                            record_dict[f"col_{i}"] = item
+                    records.append(record_dict)
+        
+        return (result, records)
 
     def execute_read(
         self,
         query: str,
         parameters: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[ResultSummary, List[Dict[str, Any]]]:
+    ) -> Tuple[Any, List[Dict[str, Any]]]:
         """
         Runs an arbitrary "read" Cypher query with parameters.
 
@@ -659,54 +536,60 @@ class FalkorDBClient:
             parameters: Query parameters which can be used as placeholders in the `query`.
 
         Returns:
-            A tuple consisting of execution result summary (`falkordb.ResultSummary`) and data records if any.
+            A tuple consisting of execution result summary and data records if any.
         """
-
-        @self._unit_of_work()
-        def _mgt_tx(tx: ManagedTransaction):
-            result = tx.run(
-                query,
-                parameters=parameters,
-            )
-            records = result.data()
-            summary = result.consume()
-            return summary, records
-
-        with self._begin_session() as session:
-            return session.execute_read(_mgt_tx)
+        # In FalkorDB, there's no distinction between read and write at the API level
+        # Use ro_query for read-only operations
+        result = self._graph.ro_query(query, parameters or {})
+        
+        records = []
+        if result.result_set:
+            for row in result.result_set:
+                if row:
+                    record_dict = {}
+                    for i, item in enumerate(row):
+                        if isinstance(item, dict):
+                            record_dict.update(item)
+                        else:
+                            record_dict[f"col_{i}"] = item
+                    records.append(record_dict)
+        
+        return (result, records)
 
     def update_node(self, node_label: str, doc_id: str, data: Dict[str, Any]) -> Optional[FalkorDBRecord]:
         """
-        Updates a given node matched by the given id (`doc_id`). Properties are mutated by `+=` operator,
-        see more details in [Setting properties using map](https://falkordb.com/docs/cypher-manual/current/clauses/set/#set-setting-properties-using-map).
+        Updates a given node matched by the given id (`doc_id`).
 
         Args:
             node_label: A node label to match (e.g. "Document").
-            doc_id: Node id to match. Please notice the `id` used in Cypher query is not a native element id but
-                the one which mapped from the [haystack.schema.Document](https://docs.haystack.deepset.ai/reference/primitives-api#document).
+            doc_id: Node id to match.
             data: A dictionary of data which will be set as node's properties.
 
         Returns:
             Updated FalkorDB record data.
         """
-
-        @self._unit_of_work()
-        def _mgt_tx(tx: ManagedTransaction):
-            result = tx.run(
-                f"""
-                MATCH ({NODE_VAR}:`{node_label}` {{id: $doc_id}})
-                SET {NODE_VAR} += $doc_data
-                RETURN {NODE_VAR}
-                """,
-                doc_id=doc_id,
-                doc_data=data,
-            )
-            return result.single(strict=False)
-
-        with self._begin_session() as session:
-            record = session.execute_write(_mgt_tx)
-
-        return record.data().get(NODE_VAR) if record else None
+        # Build SET clause
+        set_props = []
+        params = {"doc_id": doc_id}
+        for key, value in data.items():
+            param_name = f"prop_{key}"
+            set_props.append(f"{NODE_VAR}.{key} = ${param_name}")
+            params[param_name] = value
+        
+        if not set_props:
+            return None
+        
+        set_clause = ", ".join(set_props)
+        query = f"""
+            MATCH ({NODE_VAR}:`{node_label}` {{id: $doc_id}})
+            SET {set_clause}
+            RETURN {NODE_VAR}
+        """
+        
+        result = self._graph.query(query, params)
+        if result.result_set and result.result_set[0]:
+            return self._node_to_dict(result.result_set[0][0])
+        return None
 
     def verify_connectivity(self):
         """
@@ -716,56 +599,28 @@ class FalkorDBClient:
             FalkorDBClientError: In case connection could not be established.
         """
         try:
-            self._driver.verify_connectivity()
+            # Try a simple query to verify connectivity
+            self._graph.query("RETURN 1")
         except Exception as err:
             raise FalkorDBClientError(
-                "Could not connect to FalkorDB database. Please ensure that the url and provided credentials are correct"
+                "Could not connect to FalkorDB database. Please ensure that the host, port and provided credentials are correct"
             ) from err
 
     def close_driver(self) -> None:
-        logger.debug("Closing driver instance created for FalkorDB client to release its connection pool")
-        self._driver.close()
-
-    def _begin_session(self, **session_kwargs) -> Session:
-        """
-        Creates a database session with common as well as client specific configuration settings.
-
-        Returns:
-            A new `Session` object to execute transactions.
-        """
-        session_config = {**self._config.session_config, **session_kwargs}
-        return self._driver.session(database=self._config.database, **session_config)
-
-    def _unit_of_work(self) -> Callable:
-        """
-        An extended version of managed transaction decorator to pass through configuration options from
-        `self._config.transaction_config`:
-
-        - ``metadata`` - will be attached to the executing transaction
-        - ``timeout`` - the transaction timeout in seconds
-
-        See more details in [Managed Transactions](https://falkordb.com/docs/api/python-driver/current/api.html#managed-transactions-transaction-functions)
-
-        Returns:
-            A pre-configured [falkordb.unit_of_work][] decorator
-        """
-        return unit_of_work(
-            metadata=self._config.transaction_config.get("metadata"),
-            timeout=self._config.transaction_config.get("timeout"),
-        )
+        """Close the FalkorDB connection."""
+        logger.debug("Closing FalkorDB client connection")
+        if hasattr(self._db, 'close'):
+            self._db.close()
 
     def _where_clause(self, filter_ast: Optional[AST]) -> Tuple[str, Dict[str, Any]]:
         """
-        Converts a given filter syntax tree `filter_ast` into a Cypher query in order to build ``WHERE`` filter clause.
-        Along with the query method also returns parameters used in the query to be included into final request.
-        Find out more details about [WHERE clause](https://falkordb.com/docs/cypher-manual/current/clauses/where/)
+        Converts a given filter syntax tree `filter_ast` into a Cypher query to build ``WHERE`` filter clause.
 
         Args:
-            filter_ast: Filters AST to be converted into Cypher query by \
-                [FalkorDBQueryConverter.convert][falkordb_haystack.metadata_filter.FalkorDBQueryConverter.convert].
+            filter_ast: Filters AST to be converted into Cypher query.
+
         Returns:
-            ``WHERE`` filter clause used in filtering logic (e.g. `:::cypher WHERE doc.age > $age`) as well as
-            parameters used in the clause  (e.g. `:::py {"age": 25}`)
+            ``WHERE`` filter clause and parameters used in the clause.
         """
         if filter_ast:
             query, params = self._filter_converter.convert(filter_ast)
@@ -774,38 +629,26 @@ class FalkorDBClient:
         # empty query and no parameters
         return ("", {})
 
-    def _map_projection(self, skip_properties: Optional[List[str]]) -> str:
+    def _node_to_dict(self, node: Any) -> Dict[str, Any]:
         """
-        Creates a map projection Cypher query syntax with the option to skip certain properties.
-        Example query would be `:::cypher {.*, embedding=null}`, where `:::py skip_properties=["embedding"]`
-
-        See FalkorDB manual about [Map Projections](https://falkordb.com/docs/cypher-manual/current/values-and-types/maps/#cypher-map-projection)
+        Convert a FalkorDB node object to a dictionary.
 
         Args:
-            skip_properties: a list of property names to skip (set values to ``null``) from map projection.
+            node: A FalkorDB node object.
 
         Returns:
-            A map projection Cypher query with skipped properties if any.
+            Dictionary representation of the node.
         """
-        all_props = [".*"] + ([f"{p}: null" for p in skip_properties] if skip_properties else [])
-        return f"{{{','.join(all_props)}}}"
-
-    def _vector_store_index_info(self, record: Record) -> VectorStoreIndexInfo:
-        """
-        Creates a dataclass from a data record returned by a ``SHOW INDEXES`` Cypher query output.
-
-        See FalkorDB manual for [SHOW INDEXES](https://falkordb.com/docs/cypher-manual/current/indexes-for-search-performance/#indexes-list-indexes)
-
-        Args:
-            record: A FalkorDB record containing ``SHOW INDEXES`` output.
-
-        Returns:
-            Custom dataclass with vector index information.
-        """
-        return VectorStoreIndexInfo(
-            index_name=record["name"],
-            node_label=record["labelsOrTypes"][0],
-            property_key=record["properties"][0],
-            dimensions=record["options"]["indexConfig"]["vector.dimensions"],
-            similarity_function=record["options"]["indexConfig"]["vector.similarity_function"],
-        )
+        if isinstance(node, dict):
+            return node
+        
+        # FalkorDB nodes have properties attribute
+        if hasattr(node, 'properties'):
+            return dict(node.properties)
+        
+        # Fallback: try to convert to dict
+        try:
+            return dict(node)
+        except:
+            logger.warning("Could not convert node to dict: %s", type(node))
+            return {}

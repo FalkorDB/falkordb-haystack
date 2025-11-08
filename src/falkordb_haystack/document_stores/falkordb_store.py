@@ -5,15 +5,13 @@ import numpy as np
 from haystack import Document, default_from_dict, default_to_dict
 from haystack.document_stores.errors import DuplicateDocumentError
 from haystack.document_stores.types import DuplicatePolicy
-from falkordb.exceptions import DatabaseError
 from tqdm import tqdm
 
 from falkordb_haystack.client import FalkorDBClient, FalkorDBClientConfig, FalkorDBRecord
 from falkordb_haystack.client.falkordb_client import (
-    DEFAULT_NEO4J_DATABASE,
-    DEFAULT_NEO4J_PASSWORD,
-    DEFAULT_NEO4J_URI,
-    DEFAULT_NEO4J_USERNAME,
+    DEFAULT_FALKORDB_GRAPH,
+    DEFAULT_FALKORDB_HOST,
+    DEFAULT_FALKORDB_PORT,
 )
 from falkordb_haystack.document_stores.utils import (
     flatten_dict,
@@ -122,10 +120,11 @@ class FalkorDBDocumentStore:
 
     def __init__(
         self,
-        url: Optional[str] = DEFAULT_NEO4J_URI,
-        database: Optional[str] = DEFAULT_NEO4J_DATABASE,
-        username: Optional[str] = DEFAULT_NEO4J_USERNAME,
-        password: Optional[str] = DEFAULT_NEO4J_PASSWORD,
+        host: str = DEFAULT_FALKORDB_HOST,
+        port: int = DEFAULT_FALKORDB_PORT,
+        graph: str = DEFAULT_FALKORDB_GRAPH,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
         client_config: Optional[FalkorDBClientConfig] = None,
         index: str = "document-embeddings",
         node_label: str = "Document",
@@ -144,8 +143,9 @@ class FalkorDBDocumentStore:
         Constructor method
 
         Args:
-            url: URI pointing to FalkorDB instance see (https://falkordb.com/docs/api/python-driver/current/api.html#uri)
-            database: FalkorDB database to interact with.
+            host: FalkorDB host address (default: localhost)
+            port: FalkorDB port (default: 6379)
+            graph: FalkorDB graph name to use (default: haystack)
             username: Username to authenticate with the database.
             password: Password credential for the given username.
             client_config: Advanced client configuration to control various settings of underlying falkordb python
@@ -203,10 +203,15 @@ class FalkorDBDocumentStore:
 
         if falkordb_client:
             self.falkordb_client = falkordb_client
+            self.client_config = falkordb_client._config
         else:
-            if client_config and not client_config.url:
-                client_config.url = url
-            self.client_config = client_config or FalkorDBClientConfig(url, database, username, password)
+            if client_config and not client_config.host:
+                client_config.host = host
+                client_config.port = port
+                client_config.graph = graph
+            self.client_config = client_config or FalkorDBClientConfig(
+                host=host, port=port, graph=graph, username=username, password=password
+            )
             self.falkordb_client = FalkorDBClient(self.client_config)
 
         if verify_connectivity:
