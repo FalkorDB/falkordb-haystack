@@ -1,1 +1,1 @@
-::: neo4j_haystack.metadata_filter.neo4j_query_converter
+::: falkordb_haystack.metadata_filter.falkordb_query_converter

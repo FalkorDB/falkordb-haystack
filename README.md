@@ -1,19 +1,19 @@
-<h1 align="center">neo4j-haystack</h1>
+<h1 align="center">falkordb-haystack</h1>
 
-<p align="center">A <a href="https://docs.haystack.deepset.ai/docs/document_store"><i>Haystack</i></a> Document Store for <a href="https://neo4j.com/"><i>Neo4j</i></a>.</p>
+<p align="center">A <a href="https://docs.haystack.deepset.ai/docs/document_store"><i>Haystack</i></a> Document Store for <a href="https://falkordb.com/"><i>FalkorDB</i></a>.</p>
 
 <p align="center">
-  <a href="https://github.com/prosto/neo4j-haystack/actions?query=workflow%3Aci">
-    <img alt="ci" src="https://github.com/prosto/neo4j-haystack/workflows/ci/badge.svg" />
+  <a href="https://github.com/prosto/falkordb-haystack/actions?query=workflow%3Aci">
+    <img alt="ci" src="https://github.com/prosto/falkordb-haystack/workflows/ci/badge.svg" />
   </a>
-  <a href="https://prosto.github.io/neo4j-haystack/">
+  <a href="https://prosto.github.io/falkordb-haystack/">
     <img alt="documentation" src="https://img.shields.io/badge/docs-mkdocs%20material-blue.svg?style=flat" />
   </a>
-  <a href="https://pypi.org/project/neo4j-haystack/">
-    <img alt="pypi version" src="https://img.shields.io/pypi/v/neo4j-haystack.svg" />
+  <a href="https://pypi.org/project/falkordb-haystack/">
+    <img alt="pypi version" src="https://img.shields.io/pypi/v/falkordb-haystack.svg" />
   </a>
-  <a href="https://img.shields.io/pypi/pyversions/neo4j-haystack.svg">
-    <img alt="python version" src="https://img.shields.io/pypi/pyversions/neo4j-haystack.svg" />
+  <a href="https://img.shields.io/pypi/pyversions/falkordb-haystack.svg">
+    <img alt="python version" src="https://img.shields.io/pypi/pyversions/falkordb-haystack.svg" />
   </a>
   <a href="https://pypi.org/project/haystack-ai/">
     <img alt="haystack version" src="https://img.shields.io/pypi/v/haystack-ai.svg?label=haystack" />
@@ -27,7 +27,7 @@
 - [Overview](#overview)
 - [Installation](#installation)
 - [Usage](#usage)
-  - [Running Neo4j](#running-neo4j)
+  - [Running FalkorDB](#running-falkordb)
   - [Document Store](#document-store)
   - [Indexing documents](#indexing-documents)
   - [Retrieving documents](#retrieving-documents)
@@ -37,33 +37,33 @@
 
 ## Overview
 
-An integration of [Neo4j](https://neo4j.com/) graph database with [Haystack v2.0](https://docs.haystack.deepset.ai/v2.0/docs/intro)
-by [deepset](https://www.deepset.ai). In Neo4j [Vector search index](https://neo4j.com/docs/cypher-manual/current/indexes-for-vector-search/)
+An integration of [FalkorDB](https://falkordb.com/) graph database with [Haystack v2.0](https://docs.haystack.deepset.ai/v2.0/docs/intro)
+by [deepset](https://www.deepset.ai). In FalkorDB [Vector search index](https://falkordb.com/docs/cypher-manual/current/indexes-for-vector-search/)
 is being used for storing document embeddings and dense retrievals.
 
-The library allows using Neo4j as a [DocumentStore](https://docs.haystack.deepset.ai/v2.0/docs/document-store), and implements the required [Protocol](https://docs.haystack.deepset.ai/v2.0/docs/document-store#documentstore-protocol) methods. You can start working with the implementation by importing it from `neo4_haystack` package:
+The library allows using FalkorDB as a [DocumentStore](https://docs.haystack.deepset.ai/v2.0/docs/document-store), and implements the required [Protocol](https://docs.haystack.deepset.ai/v2.0/docs/document-store#documentstore-protocol) methods. You can start working with the implementation by importing it from `neo4_haystack` package:
 
 ```python
-from neo4j_haystack import Neo4jDocumentStore
+from falkordb_haystack import FalkorDBDocumentStore
 ```
 
-In addition to the `Neo4jDocumentStore` the library includes the following haystack components which can be used in a pipeline:
+In addition to the `FalkorDBDocumentStore` the library includes the following haystack components which can be used in a pipeline:
 
-- [Neo4jEmbeddingRetriever](https://prosto.github.io/neo4j-haystack/reference/neo4j_retriever/#neo4j_haystack.components.neo4j_retriever.Neo4jEmbeddingRetriever) - is a typical [retriever component](https://docs.haystack.deepset.ai/v2.0/docs/retrievers) which can be used to query vector store index and find related Documents. The component uses `Neo4jDocumentStore` to query embeddings.
-- [Neo4jDynamicDocumentRetriever](https://prosto.github.io/neo4j-haystack/reference/neo4j_retriever/#neo4j_haystack.components.neo4j_retriever.Neo4jDynamicDocumentRetriever) is also a retriever component in a sense that it can be used to query Documents in Neo4j. However it is decoupled from `Neo4jDocumentStore` and allows to run arbitrary [Cypher query](https://neo4j.com/docs/cypher-manual/current/queries/) to extract documents. Practically it is possible to query Neo4j same way `Neo4jDocumentStore` does, including vector search.
-- [Neo4jQueryReader](https://prosto.github.io/neo4j-haystack/reference/neo4j_query_reader/#neo4j_haystack.components.neo4j_query_reader.Neo4jQueryReader) - is a component which gives flexible way to read data from Neo4j by running custom Cypher query along with query parameters. You could use such queries to read data from Neo4j to enhance your RAG pipelines. For example prompting LLM to produce Cypher query based on given context (Text to Cypher) and use `Neo4jQueryReader` to run the
+- [FalkorDBEmbeddingRetriever](https://prosto.github.io/falkordb-haystack/reference/falkordb_retriever/#falkordb_haystack.components.falkordb_retriever.FalkorDBEmbeddingRetriever) - is a typical [retriever component](https://docs.haystack.deepset.ai/v2.0/docs/retrievers) which can be used to query vector store index and find related Documents. The component uses `FalkorDBDocumentStore` to query embeddings.
+- [FalkorDBDynamicDocumentRetriever](https://prosto.github.io/falkordb-haystack/reference/falkordb_retriever/#falkordb_haystack.components.falkordb_retriever.FalkorDBDynamicDocumentRetriever) is also a retriever component in a sense that it can be used to query Documents in FalkorDB. However it is decoupled from `FalkorDBDocumentStore` and allows to run arbitrary [Cypher query](https://falkordb.com/docs/cypher-manual/current/queries/) to extract documents. Practically it is possible to query FalkorDB same way `FalkorDBDocumentStore` does, including vector search.
+- [FalkorDBQueryReader](https://prosto.github.io/falkordb-haystack/reference/falkordb_query_reader/#falkordb_haystack.components.falkordb_query_reader.FalkorDBQueryReader) - is a component which gives flexible way to read data from FalkorDB by running custom Cypher query along with query parameters. You could use such queries to read data from FalkorDB to enhance your RAG pipelines. For example prompting LLM to produce Cypher query based on given context (Text to Cypher) and use `FalkorDBQueryReader` to run the
   query and extract results. [OutputAdapter](https://docs.haystack.deepset.ai/docs/outputadapter) component might
-  become handy in such scenarios - it can be used to handle outputs from `Neo4jQueryReader`.
-- [Neo4jQueryWriter](https://prosto.github.io/neo4j-haystack/reference/neo4j_query_writer/#neo4j_haystack.components.neo4j_query_writer.Neo4jQueryWriter) - this component gives flexible way to write data to Neo4j by running arbitrary Cypher query along with parameters. Query parameters can be pipeline inputs or outputs from connected components. You could use such queries to write Documents with additional graph nodes for a more complex RAG scenarios. The difference between [DocumentWriter](https://docs.haystack.deepset.ai/docs/documentwriter) and `Neo4jQueryWriter` is that the latter can write any data to Neo4j, not just Documents.
+  become handy in such scenarios - it can be used to handle outputs from `FalkorDBQueryReader`.
+- [FalkorDBQueryWriter](https://prosto.github.io/falkordb-haystack/reference/falkordb_query_writer/#falkordb_haystack.components.falkordb_query_writer.FalkorDBQueryWriter) - this component gives flexible way to write data to FalkorDB by running arbitrary Cypher query along with parameters. Query parameters can be pipeline inputs or outputs from connected components. You could use such queries to write Documents with additional graph nodes for a more complex RAG scenarios. The difference between [DocumentWriter](https://docs.haystack.deepset.ai/docs/documentwriter) and `FalkorDBQueryWriter` is that the latter can write any data to FalkorDB, not just Documents.
 
-The `neo4j-haystack` library uses [Python Driver](https://neo4j.com/docs/api/python-driver/current/api.html#api-documentation) and
-[Cypher Queries](https://neo4j.com/docs/cypher-manual/current/introduction/) to interact with Neo4j database and hide all complexities under the hood.
+The `falkordb-haystack` library uses [Python Driver](https://falkordb.com/docs/api/python-driver/current/api.html#api-documentation) and
+[Cypher Queries](https://falkordb.com/docs/cypher-manual/current/introduction/) to interact with FalkorDB database and hide all complexities under the hood.
 
-`Neo4jDocumentStore` will store Documents as Graph nodes in Neo4j. Embeddings are stored as part of the node, but indexing and querying of vector embeddings using ANN is managed by a dedicated [Vector Index](https://neo4j.com/docs/cypher-manual/current/indexes-for-vector-search/).
+`FalkorDBDocumentStore` will store Documents as Graph nodes in FalkorDB. Embeddings are stored as part of the node, but indexing and querying of vector embeddings using ANN is managed by a dedicated [Vector Index](https://falkordb.com/docs/cypher-manual/current/indexes-for-vector-search/).
 
 ```text
                                    +-----------------------------+
-                                   |       Neo4j Database        |
+                                   |       FalkorDB Database        |
                                    +-----------------------------+
                                    |                             |
                                    |      +----------------+     |
@@ -73,7 +73,7 @@ The `neo4j-haystack` library uses [Python Driver](https://neo4j.com/docs/api/pyt
           |                        |      |                |     |
 +---------+----------+             |      |   embedding    |     |
 |                    |             |      +--------+-------+     |
-| Neo4jDocumentStore |             |               |             |
+| FalkorDBDocumentStore |             |               |             |
 |                    |             |               |index/query  |
 +---------+----------+             |               |             |
           |                        |      +--------+--------+    |
@@ -87,87 +87,80 @@ The `neo4j-haystack` library uses [Python Driver](https://neo4j.com/docs/api/pyt
 
 In the above diagram:
 
-- `Document` is a Neo4j node (with "Document" label)
+- `Document` is a FalkorDB node (with "Document" label)
 - `properties` are Document [attributes](https://docs.haystack.deepset.ai/v2.0/docs/data-classes#document) stored as part of the node. **In current implementation `meta` attributes are stored on the same level as the rest of Document fields.**
 - `embedding` is also a property of the Document node (just shown separately in the diagram for clarity) which is a vector of type `LIST[FLOAT]`.
-- `Vector Index` is where embeddings are getting indexed by Neo4j as soon as those are updated in Document nodes.
+- `Vector Index` is where embeddings are getting indexed by FalkorDB as soon as those are updated in Document nodes.
 
-`Neo4jDocumentStore` by default creates a vector index if it does not exist. Before writing documents you should make sure Documents are embedded by one of the provided [embedders](https://docs.haystack.deepset.ai/v2.0/docs/embedders). For example [SentenceTransformersDocumentEmbedder](https://docs.haystack.deepset.ai/v2.0/docs/sentencetransformersdocumentembedder) can be used in indexing pipeline to calculate document embeddings before writing those to Neo4j.
+`FalkorDBDocumentStore` by default creates a vector index if it does not exist. Before writing documents you should make sure Documents are embedded by one of the provided [embedders](https://docs.haystack.deepset.ai/v2.0/docs/embedders). For example [SentenceTransformersDocumentEmbedder](https://docs.haystack.deepset.ai/v2.0/docs/sentencetransformersdocumentembedder) can be used in indexing pipeline to calculate document embeddings before writing those to FalkorDB.
 
 ## Installation
 
-`neo4j-haystack` can be installed as any other Python library, using pip:
+`falkordb-haystack` can be installed as any other Python library, using pip:
 
 ```bash
 pip install --upgrade pip # optional
 pip install sentence-transformers # required in order to run pipeline examples given below
-pip install neo4j-haystack
+pip install falkordb-haystack
 ```
 
 ## Usage
 
-### Running Neo4j
+### Running FalkorDB
 
-You will need to have a running instance of Neo4j database to use components from the package (in-memory version of Neo4j is not supported).
+You will need to have a running instance of FalkorDB database to use components from the package.
 There are several options available:
 
-- [Docker](https://neo4j.com/docs/operations-manual/5/docker/), other options available in the same Operations Manual
-- [AuraDB](https://neo4j.com/cloud/platform/aura-graph-database/) - a fully managed Cloud Instance of Neo4j
-- [Neo4j Desktop](https://neo4j.com/docs/desktop-manual/current/) client application
+- [Docker](https://docs.falkordb.com/getting-started/) - Run FalkorDB in a container
+- [FalkorDB Cloud](https://falkordb.com/) - Fully managed cloud instance
+- Local installation - See [FalkorDB documentation](https://docs.falkordb.com/)
 
 The simplest way to start database locally will be with Docker container:
 
 ```bash
-docker run \
-    --restart always \
-    --publish=7474:7474 --publish=7687:7687 \
-    --env NEO4J_AUTH=neo4j/passw0rd \
-    neo4j:5.15.0
+docker run -p 6379:6379 -it --rm falkordb/falkordb:latest
 ```
 
-As of Neo4j `5.13`, the vector search index is no longer a beta feature, consider using a version of the database `">= 5.13"`. In the example above version `5.15.0` is being used to start a container.
-You could explore Known issues and Limitations in the [documentation](https://neo4j.com/docs/cypher-manual/current/indexes/semantic-indexes/vector-indexes/).
-
-The `NEO4J_AUTH` environment variable sets default credentials (`username/password`) for authentication.
+FalkorDB 4.0+ supports native vector search for semantic similarity queries. The database uses Redis protocol and runs on port 6379 by default.
 
 > **Note**
-> Assuming you have a docker container running navigate to <http://localhost:7474> to open [Neo4j Browser](https://neo4j.com/docs/browser-manual/current/) to explore graph data and run Cypher queries.
+> FalkorDB is compatible with Redis protocol. You can use Redis clients to connect to FalkorDB on port 6379. For graph operations and Cypher queries, use the FalkorDB Python client.
 
 ### Document Store
 
-Once you have the package installed and the database running, you can start using `Neo4jDocumentStore` as any other document stores that support embeddings.
+Once you have the package installed and the database running, you can start using `FalkorDBDocumentStore` as any other document stores that support embeddings.
 
 ```python
-from neo4j_haystack import Neo4jDocumentStore
+from falkordb_haystack import FalkorDBDocumentStore
 
-document_store = Neo4jDocumentStore(
-    url="bolt://localhost:7687",
-    username="neo4j",
-    password="passw0rd",
-    database="neo4j",
+document_store = FalkorDBDocumentStore(
+    host="localhost", port=6379,
+    
+    
+    graph="haystack",
     embedding_dim=384,
     embedding_field="embedding",
-    index="document-embeddings", # The name of the Vector Index in Neo4j
-    node_label="Document", # Providing a label to Neo4j nodes which store Documents
+    index="document-embeddings", # The name of the Vector Index in FalkorDB
+    node_label="Document", # Providing a label to FalkorDB nodes which store Documents
 )
 ```
 
-Alternatively, Neo4j connection properties could be specified using a dedicated [Neo4jClientConfig](https://prosto.github.io/neo4j-haystack/reference/neo4j_client/#neo4j_haystack.client.neo4j_client.Neo4jClientConfig) class:
+Alternatively, FalkorDB connection properties could be specified using a dedicated [FalkorDBClientConfig](https://prosto.github.io/falkordb-haystack/reference/falkordb_client/#falkordb_haystack.client.falkordb_client.FalkorDBClientConfig) class:
 
 ```python
-from neo4j_haystack import Neo4jClientConfig, Neo4jDocumentStore
+from falkordb_haystack import FalkorDBClientConfig, FalkorDBDocumentStore
 
-client_config = Neo4jClientConfig(
-    url="bolt://localhost:7687",
-    username="neo4j",
-    password="passw0rd",
-    database="neo4j",
+client_config = FalkorDBClientConfig(
+    host="localhost", port=6379,
+    
+    
+    graph="haystack",
 )
 
-document_store = Neo4jDocumentStore(client_config=client_config, embedding_dim=384)
+document_store = FalkorDBDocumentStore(client_config=client_config, embedding_dim=384)
 ```
 
-Assuming there is a list of documents available and a running Neo4j database you can write/index those in Neo4j, e.g.:
+Assuming there is a list of documents available and a running FalkorDB database you can write/index those in FalkorDB, e.g.:
 
 ```python
 from haystack import Document
@@ -194,12 +187,12 @@ documents_with_embeddings = document_embedder.run(documents)
 document_store.write_documents(documents_with_embeddings.get("documents"))
 ```
 
-Make sure embedding model produces vectors of same size as it has been set on `Neo4jDocumentStore`, e.g. setting `embedding_dim=384` would comply with the "sentence-transformers/all-MiniLM-L6-v2" model.
+Make sure embedding model produces vectors of same size as it has been set on `FalkorDBDocumentStore`, e.g. setting `embedding_dim=384` would comply with the "sentence-transformers/all-MiniLM-L6-v2" model.
 
 > **Note**
 > Most of the time you will be using [Haystack Pipelines](https://docs.haystack.deepset.ai/v2.0/docs/pipelines) to build both indexing and querying RAG scenarios.
 
-It is important to understand how haystack Documents are stored in Neo4j after you call `write_documents`.
+It is important to understand how haystack Documents are stored in FalkorDB after you call `write_documents`.
 
 ```python
 from random import random
@@ -226,13 +219,13 @@ The above code converts a Document to a dictionary and will render the following
 }
 ```
 
-The data from the dictionary will be used to create a node in Neo4j after you write the document with `document_store.write_documents([document])`. You could query it with Cypher, e.g. `MATCH (doc:Document) RETURN doc`. Below is a json representation of the node in Neo4j:
+The data from the dictionary will be used to create a node in FalkorDB after you write the document with `document_store.write_documents([document])`. You could query it with Cypher, e.g. `MATCH (doc:Document) RETURN doc`. Below is a json representation of the node in FalkorDB:
 
 ```js
 {
   "identity": 0,
   "labels": [
-    "Document" // label name is specified in the Neo4jDocumentStore.node_label argument
+    "Document" // label name is specified in the FalkorDBDocumentStore.node_label argument
   ],
   "properties": { // this is where Document data is stored
     "id": "11c255ad10bff4286781f596a5afd9ab093ed056d41bca4120c849058e52f24d",
@@ -245,14 +238,14 @@ The data from the dictionary will be used to create a node in Neo4j after you wr
 ```
 
 > **Note**
-> Metadata (`num_of_years`) is serialized to the same level as rest of attributes (flatten). **It is expected by current implementation** as Neo4j node's properties can not have nested structures.
+> Metadata (`num_of_years`) is serialized to the same level as rest of attributes (flatten). **It is expected by current implementation** as FalkorDB node's properties can not have nested structures.
 
-The full list of parameters accepted by `Neo4jDocumentStore` can be found in
-[API documentation](https://prosto.github.io/neo4j-haystack/reference/neo4j_store/#neo4j_haystack.document_stores.neo4j_store.Neo4jDocumentStore.__init__).
+The full list of parameters accepted by `FalkorDBDocumentStore` can be found in
+[API documentation](https://prosto.github.io/falkordb-haystack/reference/falkordb_store/#falkordb_haystack.document_stores.falkordb_store.FalkorDBDocumentStore.__init__).
 
 ### Indexing documents
 
-With Haystack you can use [DocumentWriter](https://docs.haystack.deepset.ai/v2.0/docs/documentwriter) component to write Documents into a Document Store. In the example below we construct pipeline to write documents to Neo4j using `Neo4jDocumentStore`:
+With Haystack you can use [DocumentWriter](https://docs.haystack.deepset.ai/v2.0/docs/documentwriter) component to write Documents into a Document Store. In the example below we construct pipeline to write documents to FalkorDB using `FalkorDBDocumentStore`:
 
 ```python
 from haystack import Document
@@ -260,15 +253,15 @@ from haystack.components.embedders import SentenceTransformersDocumentEmbedder
 from haystack.components.writers import DocumentWriter
 from haystack.pipeline import Pipeline
 
-from neo4j_haystack import Neo4jDocumentStore
+from falkordb_haystack import FalkorDBDocumentStore
 
 documents = [Document(content="This is document 1"), Document(content="This is document 2")]
 
-document_store = Neo4jDocumentStore(
-    url="bolt://localhost:7687",
-    username="neo4j",
-    password="passw0rd",
-    database="neo4j",
+document_store = FalkorDBDocumentStore(
+    host="localhost", port=6379,
+    
+    
+    graph="haystack",
     embedding_dim=384,
     embedding_field="embedding",
     index="document-embeddings",
@@ -292,7 +285,7 @@ indexing_pipeline.run({"embedder": {"documents": documents}})
 
 ### Retrieving documents
 
-`Neo4jEmbeddingRetriever` component can be used to retrieve documents from Neo4j by querying vector index using an embedded query. Below is a pipeline which finds documents using query embedding as well as [metadata filtering](https://docs.haystack.deepset.ai/v2.0/docs/metadata-filtering):
+`FalkorDBEmbeddingRetriever` component can be used to retrieve documents from FalkorDB by querying vector index using an embedded query. Below is a pipeline which finds documents using query embedding as well as [metadata filtering](https://docs.haystack.deepset.ai/v2.0/docs/metadata-filtering):
 
 ```python
 from typing import List
@@ -300,13 +293,13 @@ from typing import List
 from haystack import Document, Pipeline
 from haystack.components.embedders import SentenceTransformersDocumentEmbedder, SentenceTransformersTextEmbedder
 
-from neo4j_haystack import Neo4jDocumentStore, Neo4jEmbeddingRetriever
+from falkordb_haystack import FalkorDBDocumentStore, FalkorDBEmbeddingRetriever
 
-document_store = Neo4jDocumentStore(
-    url="bolt://localhost:7687",
-    username="neo4j",
-    password="passw0rd",
-    database="neo4j",
+document_store = FalkorDBDocumentStore(
+    host="localhost", port=6379,
+    
+    
+    graph="haystack",
     embedding_dim=384,
     index="document-embeddings",
 )
@@ -329,7 +322,7 @@ print("Number of documents written: ", document_store.count_documents())
 
 pipeline = Pipeline()
 pipeline.add_component("text_embedder", SentenceTransformersTextEmbedder(model=model_name))
-pipeline.add_component("retriever", Neo4jEmbeddingRetriever(document_store=document_store))
+pipeline.add_component("retriever", FalkorDBEmbeddingRetriever(document_store=document_store))
 pipeline.connect("text_embedder.embedding", "retriever.query_embedding")
 
 result = pipeline.run(
@@ -351,17 +344,17 @@ documents: List[Document] = result["retriever"]["documents"]
 ```
 
 > **Note**
-> You can learn more about how a given metadata filter is converted into Cypher queries by looking at documentation of the [Neo4jQueryConverter](https://prosto.github.io/neo4j-haystack/reference/metadata_filter/neo4j_query_converter/#neo4j_haystack.metadata_filter.neo4j_query_converter.Neo4jQueryConverter) class.
+> You can learn more about how a given metadata filter is converted into Cypher queries by looking at documentation of the [FalkorDBQueryConverter](https://prosto.github.io/falkordb-haystack/reference/metadata_filter/falkordb_query_converter/#falkordb_haystack.metadata_filter.falkordb_query_converter.FalkorDBQueryConverter) class.
 
 ### Retrieving documents using Cypher
 
-In certain scenarios you might have an existing graph in Neo4j database which was created by custom scripts or data ingestion pipelines. The schema of the graph could be complex and not exactly fitting into Haystack Document model. Moreover in many situations you might want to leverage existing graph data to extract more context for grounding LLMs. To make it possible with Haystack we have `Neo4jDynamicDocumentRetriever` component - a flexible retriever which can run arbitrary Cypher query to obtain documents. This component does not require Document Store to operate.
+In certain scenarios you might have an existing graph in FalkorDB database which was created by custom scripts or data ingestion pipelines. The schema of the graph could be complex and not exactly fitting into Haystack Document model. Moreover in many situations you might want to leverage existing graph data to extract more context for grounding LLMs. To make it possible with Haystack we have `FalkorDBDynamicDocumentRetriever` component - a flexible retriever which can run arbitrary Cypher query to obtain documents. This component does not require Document Store to operate.
 
 > **Note**
-> The logic of `Neo4jDynamicDocumentRetriever` could be easily achieved with `Neo4jQueryReader` + `OutputAdapter` components.
-> `Neo4jDynamicDocumentRetriever` makes sense when you specifically expect Documents as an output of a query execution and would like to avoid additional output conversions in your pipeline (e.g. "Neo4j Record" --> Document).
+> The logic of `FalkorDBDynamicDocumentRetriever` could be easily achieved with `FalkorDBQueryReader` + `OutputAdapter` components.
+> `FalkorDBDynamicDocumentRetriever` makes sense when you specifically expect Documents as an output of a query execution and would like to avoid additional output conversions in your pipeline (e.g. "FalkorDB Record" --> Document).
 
-The above example of `Neo4jEmbeddingRetriever` could be rewritten without usage of `Neo4jDocumentStore` in the retrieval pipeline:
+The above example of `FalkorDBEmbeddingRetriever` could be rewritten without usage of `FalkorDBDocumentStore` in the retrieval pipeline:
 
 ```python
 from typing import List
@@ -369,13 +362,13 @@ from typing import List
 from haystack import Document, Pipeline
 from haystack.components.embedders import SentenceTransformersDocumentEmbedder, SentenceTransformersTextEmbedder
 
-from neo4j_haystack import Neo4jClientConfig, Neo4jDocumentStore, Neo4jDynamicDocumentRetriever
+from falkordb_haystack import FalkorDBClientConfig, FalkorDBDocumentStore, FalkorDBDynamicDocumentRetriever
 
-client_config = Neo4jClientConfig(
-    url="bolt://localhost:7687",
-    username="neo4j",
-    password="passw0rd",
-    database="neo4j",
+client_config = FalkorDBClientConfig(
+    host="localhost", port=6379,
+    
+    
+    graph="haystack",
 )
 
 documents = [
@@ -390,7 +383,7 @@ document_embedder = SentenceTransformersDocumentEmbedder(model=model_name)
 document_embedder.warm_up()
 documents_with_embeddings = document_embedder.run(documents)
 
-document_store = Neo4jDocumentStore(client_config=client_config, embedding_dim=384)
+document_store = FalkorDBDocumentStore(client_config=client_config, embedding_dim=384)
 document_store.write_documents(documents_with_embeddings.get("documents"))
 
 # Same model is used for both query and Document embeddings
@@ -405,7 +398,7 @@ cypher_query = """
         """
 
 embedder = SentenceTransformersTextEmbedder(model="sentence-transformers/all-MiniLM-L6-v2")
-retriever = Neo4jDynamicDocumentRetriever(
+retriever = FalkorDBDynamicDocumentRetriever(
     client_config=client_config, runtime_parameters=["query_embedding"], doc_node_name="doc"
 )
 
@@ -439,9 +432,9 @@ Please notice how query parameters are being used in the `cypher_query`:
 - `pipeline.run` specifies additional parameters to the `retriever` component which can be referenced in the
   `cypher_query`, e.g. `top_k` and `num_of_years`.
 
-In some way `Neo4jDynamicDocumentRetriever` resembles the [PromptBuilder](https://docs.haystack.deepset.ai/v2.0/docs/promptbuilder) component, only instead of prompt it constructs a Cypher query using [parameters](https://neo4j.com/docs/python-manual/current/query-simple/#query-parameters). In the example above documents retrieved by running the query, the `RETURN doc{.*, score}` part returns back found documents with scores. Which node variable is going to be used to construct haystack Document is specified in the `doc_node_name` parameter (see above `doc_node_name="doc"`).
+In some way `FalkorDBDynamicDocumentRetriever` resembles the [PromptBuilder](https://docs.haystack.deepset.ai/v2.0/docs/promptbuilder) component, only instead of prompt it constructs a Cypher query using [parameters](https://falkordb.com/docs/python-manual/current/query-simple/#query-parameters). In the example above documents retrieved by running the query, the `RETURN doc{.*, score}` part returns back found documents with scores. Which node variable is going to be used to construct haystack Document is specified in the `doc_node_name` parameter (see above `doc_node_name="doc"`).
 
-You have options to enhance your RAG pipeline with data having various schemas, for example by first finding nodes using vector search and then expanding query to search for nearby nodes using appropriate Cypher syntax. It is possible to implement "Parent-Child" chunking strategy with such approach. Before that you have to ingest/index data into Neo4j accordingly by building an indexing pipeline or a custom ingestion script. A simple schema is shown below:
+You have options to enhance your RAG pipeline with data having various schemas, for example by first finding nodes using vector search and then expanding query to search for nearby nodes using appropriate Cypher syntax. It is possible to implement "Parent-Child" chunking strategy with such approach. Before that you have to ingest/index data into FalkorDB accordingly by building an indexing pipeline or a custom ingestion script. A simple schema is shown below:
 
 ```text
 ┌────────────┐                ┌─────────────┐
@@ -452,7 +445,7 @@ You have options to enhance your RAG pipeline with data having various schemas, 
 └────────────┘                └─────────────┘
 ```
 
-The following Cypher query is an example of how `Neo4jDynamicDocumentRetriever` can first search embeddings for `Child` document chunks and then **return** `Parent` documents which have larger context window (text length) for RAG applications:
+The following Cypher query is an example of how `FalkorDBDynamicDocumentRetriever` can first search embeddings for `Child` document chunks and then **return** `Parent` documents which have larger context window (text length) for RAG applications:
 
 ```cypher
 // Query Child documents by $query_embedding
@@ -469,14 +462,14 @@ As you might have guessed, the value for the `doc_node_name` parameter should be
 
 ### More examples
 
-You can find more examples in the implementation [repository](https://github.com/prosto/neo4j-haystack/tree/main/examples):
+You can find more examples in the implementation [repository](https://github.com/prosto/falkordb-haystack/tree/main/examples):
 
-- [indexing_pipeline.py](https://github.com/prosto/neo4j-haystack/blob/main/examples/indexing_pipeline.py) - Indexing text files (documents) from a remote http location.
-- [rag_pipeline.py](https://github.com/prosto/neo4j-haystack/blob/main/examples/rag_pipeline.py) - Generative question answering RAG pipeline using `Neo4jEmbeddingRetriever` to fetch documents from Neo4j document store and answer question using [HuggingFaceTGIGenerator](https://docs.haystack.deepset.ai/v2.0/docs/huggingfacetgigenerator).
-- [rag_pipeline_cypher.py](https://github.com/prosto/neo4j-haystack/blob/main/examples/rag_pipeline_cypher.py) - Same as `rag_pipeline.py` but using `Neo4jDynamicDocumentRetriever`.
+- [indexing_pipeline.py](https://github.com/prosto/falkordb-haystack/blob/main/examples/indexing_pipeline.py) - Indexing text files (documents) from a remote http location.
+- [rag_pipeline.py](https://github.com/prosto/falkordb-haystack/blob/main/examples/rag_pipeline.py) - Generative question answering RAG pipeline using `FalkorDBEmbeddingRetriever` to fetch documents from FalkorDB document store and answer question using [HuggingFaceTGIGenerator](https://docs.haystack.deepset.ai/v2.0/docs/huggingfacetgigenerator).
+- [rag_pipeline_cypher.py](https://github.com/prosto/falkordb-haystack/blob/main/examples/rag_pipeline_cypher.py) - Same as `rag_pipeline.py` but using `FalkorDBDynamicDocumentRetriever`.
 
-More technical details available in the [Code Reference](https://prosto.github.io/neo4j-haystack/reference/neo4j_store/) documentation. For example, in real world scenarios there could be requirements to tune connection settings to Neo4j database (e.g. request timeout). [Neo4jDocumentStore](https://prosto.github.io/neo4j-haystack/reference/neo4j_store/#neo4j_haystack.document_stores.Neo4jDocumentStore.__init__) accepts an extended client configuration using [Neo4jClientConfig](https://prosto.github.io/neo4j-haystack/reference/neo4j_client/#neo4j_haystack.client.neo4j_client.Neo4jClientConfig) class.
+More technical details available in the [Code Reference](https://prosto.github.io/falkordb-haystack/reference/falkordb_store/) documentation. For example, in real world scenarios there could be requirements to tune connection settings to FalkorDB database (e.g. request timeout). [FalkorDBDocumentStore](https://prosto.github.io/falkordb-haystack/reference/falkordb_store/#falkordb_haystack.document_stores.FalkorDBDocumentStore.__init__) accepts an extended client configuration using [FalkorDBClientConfig](https://prosto.github.io/falkordb-haystack/reference/falkordb_client/#falkordb_haystack.client.falkordb_client.FalkorDBClientConfig) class.
 
 ## License
 
-`neo4j-haystack` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
+`falkordb-haystack` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.

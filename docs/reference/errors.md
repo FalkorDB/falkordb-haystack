@@ -1,1 +1,1 @@
-::: neo4j_haystack.errors
+::: falkordb_haystack.errors

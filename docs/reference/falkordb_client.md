@@ -1,1 +1,1 @@
-::: neo4j_haystack.client.neo4j_client
+::: falkordb_haystack.client.falkordb_client

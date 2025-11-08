@@ -1,1 +1,1 @@
-::: neo4j_haystack.components.neo4j_retriever
+::: falkordb_haystack.components.falkordb_retriever

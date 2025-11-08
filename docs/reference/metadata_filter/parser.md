@@ -1,1 +1,1 @@
-::: neo4j_haystack.metadata_filter.parser
+::: falkordb_haystack.metadata_filter.parser
