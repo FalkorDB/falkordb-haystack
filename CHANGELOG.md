@@ -7,6 +7,71 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) a
 
 <!-- insertion marker -->
 
+## [v1.0.0](https://github.com/FalkorDB/falkordb-haystack/releases/tag/v1.0.0) - 2025-01-08
+
+### Breaking Changes
+
+- **Complete conversion from Neo4j to FalkorDB**: This is a major rewrite converting the integration from Neo4j to FalkorDB graph database.
+- Package renamed from `neo4j-haystack` to `falkordb-haystack`
+- All classes renamed from `Neo4j*` to `FalkorDB*` (e.g., `Neo4jDocumentStore` → `FalkorDBDocumentStore`)
+- Connection parameters changed:
+  - From: `url`, `database`, `username`, `password`
+  - To: `host`, `port`, `graph`, `username`, `password`
+- Python driver changed from `neo4j` to `falkordb`
+- API completely rewritten to use FalkorDB's graph query interface
+
+### Features
+
+- Native FalkorDB vector search support using `vecf32` format
+- OpenCypher query compatibility maintained
+- Support for FalkorDB's vector index creation syntax
+- Direct graph query execution without session management
+- Compatible with FalkorDB 4.0+ with native vector search
+
+### Migration Guide
+
+To migrate from neo4j-haystack to falkordb-haystack:
+
+1. Update your imports:
+   ```python
+   # Old
+   from neo4j_haystack import Neo4jDocumentStore
+   
+   # New
+   from falkordb_haystack import FalkorDBDocumentStore
+   ```
+
+2. Update connection parameters:
+   ```python
+   # Old
+   document_store = Neo4jDocumentStore(
+       url="bolt://localhost:7687",
+       database="neo4j",
+       username="neo4j",
+       password="password"
+   )
+   
+   # New
+   document_store = FalkorDBDocumentStore(
+       host="localhost",
+       port=6379,
+       graph="haystack"
+   )
+   ```
+
+3. Start FalkorDB instead of Neo4j:
+   ```bash
+   # Old
+   docker run -p 7474:7474 -p 7687:7687 neo4j:5.15.0
+   
+   # New
+   docker run -p 6379:6379 falkordb/falkordb:latest
+   ```
+
+---
+
+## Previous Neo4j Integration History
+
 ## [v2.2.1](https://github.com/prosto/neo4j-haystack/releases/tag/v2.2.1) - 2025-04-10
 
 <small>[Compare with v2.2.0](https://github.com/prosto/neo4j-haystack/compare/v2.2.0...v2.2.1)</small>

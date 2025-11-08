@@ -1,0 +1,118 @@
+from dataclasses import asdict, is_dataclass
+from typing import Any, Dict
+
+from haystack import Document
+from haystack.dataclasses.chat_message import ChatMessage
+
+from falkordb_haystack.serialization.types import QueryParametersMarshaller
+
+
+class DocumentQueryParametersMarshaller(QueryParametersMarshaller):
+    """
+    A marshaller which converts `haystack.Document` to a dictionary when it is used as query parameter in Cypher query
+
+    Haystack's native `to_dict` method is called to produce a flattened dictionary of Document data along with its meta
+    fields.
+    """
+
+    def supports(self, obj: Any) -> bool:
+        """
+        Checks if given object is `haystack.Document` instance
+        """
+        return isinstance(obj, Document)
+
+    def marshal(self, obj: Any) -> Dict[str, Any]:
+        """
+        Converts `haystack.Document` to dictionary so it could be used as Cypher query parameter
+        """
+        return obj.to_dict(flatten=True)
+
+
+class ChatMessageParametersMarshaller(QueryParametersMarshaller):
+    """
+    A marshaller which converts `haystack.dataclasses.chat_message.ChatMessage` to a dictionary when it is used as
+    query parameter in Cypher queries
+
+    Haystack's native `to_dict` method is called to produce a dictionary of Document data along with its meta
+    fields.
+    """
+
+    def supports(self, obj: Any) -> bool:
+        return isinstance(obj, ChatMessage)
+
+    def marshal(self, obj: Any) -> Dict[str, Any]:
+        return obj.to_dict()
+
+
+class DataclassQueryParametersMarshaller(QueryParametersMarshaller):
+    """
+    A marshaller which converts a `dataclass` to a dictionary when encountered as Cypher query parameter.
+    """
+
+    def supports(self, obj: Any) -> bool:
+        """
+        Checks if given object is a python `dataclass` instance
+        """
+        return is_dataclass(obj) and not isinstance(obj, type)
+
+    def marshal(self, obj: Any) -> Dict[str, Any]:
+        """
+        Converts `dataclass` to dictionary so it could be used as Cypher query parameter.
+        """
+        return asdict(obj)
+
+
+class FalkorDBQueryParametersMarshaller(QueryParametersMarshaller):
+    """
+    The marshaller converts Cypher query parameters to types which can be consumed in FalkorDB query execution. In some
+    cases query parameters contain complex data types (e.g. dataclasses) which can be converted to `dict` types and
+    thus become eligible for running a Cypher query:
+
+    ```py title="Example: Running a query with a dataclass parameter"
+    from dataclasses import dataclass
+    from falkordb_haystack.client import FalkorDBClient, FalkorDBClientConfig
+    from falkordb_haystack.serialization import FalkorDBQueryParametersMarshaller
+
+    @dataclass
+    class YearInfo:
+        year: int = 2024
+
+    falkordb_config = FalkorDBClientConfig("bolt://localhost:7687", database="falkordb", username="falkordb", password="passw0rd")
+    falkordb_client = FalkorDBClient(client_config=falkordb_config)
+
+    marshaller = FalkorDBQueryParametersMarshaller()
+    query_params = marshaller.marshall({"year_info": YearInfo()})
+
+    falkordb_client.execute_read(
+        "MATCH (doc:`Document`) WHERE doc.year=$year_info.year RETURN doc",
+        parameters=query_params
+    )
+    ```
+    The above example would fail without marshaller. With marshaller `query_params` will become
+    `:::py {"year_info": {"year": 2024}}` which is eligible input for FalkorDB Driver.
+    """
+
+    def __init__(self):
+        # Order of marshallers is important - first one which supports the type will be used
+        self._marshallers = [
+            DocumentQueryParametersMarshaller(),
+            ChatMessageParametersMarshaller(),
+            DataclassQueryParametersMarshaller(),
+        ]
+
+    def supports(self, _obj: Any) -> bool:
+        """
+        Supports conversion of any type
+        """
+        return True
+
+    def marshal(self, data) -> Any:
+        if isinstance(data, dict):
+            return {key: self.marshal(value) for key, value in data.items()}
+        elif isinstance(data, (list, tuple, set)):
+            return [self.marshal(value) for value in data]
+
+        # Find a marshaller which supports given type of parameter otherwise return parameter as is
+        marshaller = next((m for m in self._marshallers if m.supports(data)), None)
+
+        return self.marshal(marshaller.marshal(data)) if marshaller else data

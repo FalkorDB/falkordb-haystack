@@ -5,21 +5,21 @@ from haystack.components.converters import TextFileToDocument
 from haystack.components.embedders import SentenceTransformersDocumentEmbedder
 from haystack.components.preprocessors import DocumentCleaner, DocumentSplitter
 
-from neo4j_haystack.client.neo4j_client import Neo4jClientConfig
-from neo4j_haystack.components.neo4j_query_writer import Neo4jQueryWriter
+from falkordb_haystack.client.falkordb_client import FalkorDBClientConfig
+from falkordb_haystack.components.falkordb_query_writer import FalkorDBQueryWriter
 
-# Make sure you have a running Neo4j database, e.g. with Docker:
+# Make sure you have a running FalkorDB database, e.g. with Docker:
 # docker run \
 #     --restart always \
 #     --publish=7474:7474 --publish=7687:7687 \
-#     --env NEO4J_AUTH=neo4j/passw0rd \
-#     neo4j:5.16.0
+#     --env NEO4J_AUTH=falkordb/passw0rd \
+#     falkordb:5.16.0
 
-client_config = Neo4jClientConfig(
-    url="bolt://localhost:7687",
-    username="neo4j",
+client_config = FalkorDBClientConfig(
+    host="localhost", port=6379,
+    username="falkordb",
     password="passw0rd",
-    database="neo4j",
+    graph="haystack",
 )
 
 pipe = Pipeline()
@@ -29,20 +29,20 @@ pipe.add_component("parent_splitter", DocumentSplitter(split_by="word", split_le
 pipe.add_component("child_splitter", DocumentSplitter(split_by="word", split_length=100, split_overlap=24))
 pipe.add_component("embedder", SentenceTransformersDocumentEmbedder(model="sentence-transformers/all-MiniLM-L6-v2"))
 pipe.add_component(
-    "neo4j_writer",
-    Neo4jQueryWriter(client_config=client_config, runtime_parameters=["child_documents", "parent_documents"]),
+    "falkordb_writer",
+    FalkorDBQueryWriter(client_config=client_config, runtime_parameters=["child_documents", "parent_documents"]),
 )
 pipe.add_component(
-    "neo4j_vector_index", Neo4jQueryWriter(client_config=client_config, runtime_parameters=["query_status"])
+    "falkordb_vector_index", FalkorDBQueryWriter(client_config=client_config, runtime_parameters=["query_status"])
 )
 
 pipe.connect("text_file_converter.documents", "cleaner.documents")
 pipe.connect("cleaner.documents", "parent_splitter.documents")
 pipe.connect("parent_splitter.documents", "child_splitter.documents")
 pipe.connect("child_splitter.documents", "embedder.documents")
-pipe.connect("embedder.documents", "neo4j_writer.child_documents")
-pipe.connect("parent_splitter.documents", "neo4j_writer.parent_documents")
-pipe.connect("neo4j_writer.query_status", "neo4j_vector_index.query_status")
+pipe.connect("embedder.documents", "falkordb_writer.child_documents")
+pipe.connect("parent_splitter.documents", "falkordb_writer.parent_documents")
+pipe.connect("falkordb_writer.query_status", "falkordb_vector_index.query_status")
 
 # Take the docs data directory as input and run the pipeline
 file_paths = [Path(__file__).resolve().parent / "dune.txt"]
@@ -79,11 +79,11 @@ cypher_query_create_index = """
 result = pipe.run(
     {
         "text_file_converter": {"sources": file_paths},
-        "neo4j_writer": {
+        "falkordb_writer": {
             "query": cypher_query_create_documents,
             "parameters": {"parent_label": "Parent", "child_label": "Chunk"},
         },
-        "neo4j_vector_index": {
+        "falkordb_vector_index": {
             "query": cypher_query_create_index,
             "parameters": {
                 "vector_dimensions": 384,
@@ -93,4 +93,4 @@ result = pipe.run(
     }
 )
 
-# Assuming you have a docker container running navigate to http://localhost:7474 to open Neo4j Browser
+# Assuming you have a docker container running navigate to http://localhost:7474 to open FalkorDB Browser

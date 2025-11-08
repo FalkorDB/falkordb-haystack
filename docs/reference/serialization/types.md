@@ -1,1 +1,1 @@
-::: neo4j_haystack.serialization.types
+::: falkordb_haystack.serialization.types

@@ -1,1 +1,1 @@
-::: neo4j_haystack.serialization.query_parameters_marshaller
+::: falkordb_haystack.serialization.query_parameters_marshaller
