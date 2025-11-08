@@ -5,24 +5,24 @@ from haystack.components.embedders import SentenceTransformersTextEmbedder
 from haystack.components.generators import HuggingFaceAPIGenerator
 from haystack.utils import Secret
 
-from neo4j_haystack import Neo4jDocumentStore, Neo4jEmbeddingRetriever
+from falkordb_haystack import FalkorDBDocumentStore, FalkorDBEmbeddingRetriever
 
 # Load HF Token from environment variables.
 HF_TOKEN = Secret.from_env_var("HF_API_TOKEN")
 
-# Make sure you have a running Neo4j database with indexed documents available (see `indexing_pipeline.py`),
+# Make sure you have a running FalkorDB database with indexed documents available (see `indexing_pipeline.py`),
 # e.g. with Docker:
 # docker run \
 #     --restart always \
 #     --publish=7474:7474 --publish=7687:7687 \
-#     --env NEO4J_AUTH=neo4j/passw0rd \
-#     neo4j:5.15.0
+#     --env NEO4J_AUTH=falkordb/passw0rd \
+#     falkordb:5.15.0
 
-document_store = Neo4jDocumentStore(
+document_store = FalkorDBDocumentStore(
     url="bolt://localhost:7687",
-    username="neo4j",
+    username="falkordb",
     password="passw0rd",
-    database="neo4j",
+    database="falkordb",
     embedding_dim=384,
     similarity="cosine",
     recreate_index=False,  # Do not delete index as it was created by indexer pipeline
@@ -45,7 +45,7 @@ rag_pipeline.add_component(
     "query_embedder",
     SentenceTransformersTextEmbedder(model="sentence-transformers/all-MiniLM-L6-v2", progress_bar=False),
 )
-rag_pipeline.add_component("retriever", Neo4jEmbeddingRetriever(document_store=document_store))
+rag_pipeline.add_component("retriever", FalkorDBEmbeddingRetriever(document_store=document_store))
 rag_pipeline.add_component("prompt_builder", PromptBuilder(template=prompt_template))
 rag_pipeline.add_component(
     "llm",

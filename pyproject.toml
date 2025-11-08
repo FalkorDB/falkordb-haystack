@@ -3,13 +3,13 @@ requires = ["hatchling>=1.8.0", "hatch-regex-commit"]
 build-backend = "hatchling.build"
 
 [project]
-name = "neo4j-haystack"
+name = "falkordb-haystack"
 dynamic = ["version"]
-description = 'Integration of Neo4j graph database with Haystack'
+description = 'Integration of FalkorDB graph database with Haystack'
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
-keywords = ["Haystack", "semantic-search", "DocumentStore", "neo4j"]
+keywords = ["Haystack", "semantic-search", "DocumentStore", "falkordb"]
 authors = [
   { name = "Sergey Bondarenco", email = "sergey.bondarenco@outlook.com" },
 ]
@@ -24,7 +24,7 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dependencies = ["haystack-ai>=2.6.0", "neo4j>=5.8.1"]
+dependencies = ["haystack-ai>=2.6.0", "falkordb>=4.0.0"]
 
 [project.optional-dependencies]
 docker = ["docker"]
@@ -32,7 +32,7 @@ tests = [
   "numpy<2",                      # Haystack is compatible both with numpy 1.x and 2.x, but we test with <2
   "coverage[toml]>=7.6.1",
   "pytest",
-  "neo4j-haystack[docker]",
+  "falkordb-haystack[docker]",
   "sentence-transformers>=3.1.0",
 ]
 docs = [
@@ -47,16 +47,16 @@ maintain = ["git-changelog>=2.5.2"]
 quality = ["black>=24.8.0", "ruff>=0.6.5"]
 typing = ["mypy>=1.11.2"]
 examples = ["datasets"]
-all = ["neo4j-haystack[docker,tests,docs,maintain,quality,typing,examples]"]
+all = ["falkordb-haystack[docker,tests,docs,maintain,quality,typing,examples]"]
 
 [project.urls]
-Documentation = "https://prosto.github.io/neo4j-haystack"
-Issues = "https://github.com/prosto/neo4j-haystack/issues"
-Source = "https://github.com/prosto/neo4j-haystack"
+Documentation = "https://github.com/FalkorDB/falkordb-haystack"
+Issues = "https://github.com/FalkorDB/falkordb-haystack/issues"
+Source = "https://github.com/FalkorDB/falkordb-haystack"
 
 [tool.hatch.version]
 source = "regex_commit"
-path = "src/neo4j_haystack/__about__.py"
+path = "src/falkordb_haystack/__about__.py"
 tag_sign = false
 tag_name = "v{new_version}"
 commit_message = "🚀 Version {new_version}"
@@ -136,7 +136,7 @@ template = "lint"
 features = ["quality", "typing"]
 
 [tool.hatch.envs.lint.scripts]
-typing = "mypy --install-types --non-interactive {args:src/neo4j_haystack tests examples scripts}"
+typing = "mypy --install-types --non-interactive {args:src/falkordb_haystack tests examples scripts}"
 style = ["ruff check {args:.}", "black --check --diff {args:.}"]
 fmt = ["black {args:.}", "ruff check --fix {args:.}", "style"]
 all = ["style", "typing"]
@@ -212,7 +212,7 @@ lint.unfixable = [
 ignore_missing_imports = true
 
 [tool.ruff.lint.isort]
-known-first-party = ["neo4j_haystack"]
+known-first-party = ["falkordb_haystack"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
@@ -222,14 +222,14 @@ ban-relative-imports = "all"
 "tests/**/*" = ["PLR2004", "S101", "TID252"]
 
 [tool.coverage.run]
-source_pkgs = ["neo4j_haystack", "tests"]
+source_pkgs = ["falkordb_haystack", "tests"]
 branch = true
 parallel = true
-omit = ["src/neo4j_haystack/__about__.py"]
+omit = ["src/falkordb_haystack/__about__.py"]
 
 [tool.coverage.paths]
-neo4j_haystack = ["src/neo4j_haystack", "*/neo4j-haystack/src/neo4j_haystack"]
-tests = ["tests", "*/neo4j-haystack/tests"]
+falkordb_haystack = ["src/falkordb_haystack", "*/falkordb-haystack/src/falkordb_haystack"]
+tests = ["tests", "*/falkordb-haystack/tests"]
 
 [tool.coverage.report]
 exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]

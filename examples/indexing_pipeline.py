@@ -11,7 +11,7 @@ from haystack.components.embedders import SentenceTransformersDocumentEmbedder
 from haystack.components.preprocessors import DocumentCleaner, DocumentSplitter
 from haystack.components.writers import DocumentWriter
 
-from neo4j_haystack import Neo4jDocumentStore
+from falkordb_haystack import FalkorDBDocumentStore
 
 logger = logging.getLogger(__name__)
 
@@ -33,18 +33,18 @@ fetch_archive_from_http(
     output_dir=docs_dir,
 )
 
-# Make sure you have a running Neo4j database, e.g. with Docker:
+# Make sure you have a running FalkorDB database, e.g. with Docker:
 # docker run \
 #     --restart always \
 #     --publish=7474:7474 --publish=7687:7687 \
-#     --env NEO4J_AUTH=neo4j/passw0rd \
-#     neo4j:5.15.0
+#     --env NEO4J_AUTH=falkordb/passw0rd \
+#     falkordb:5.15.0
 
-document_store = Neo4jDocumentStore(
+document_store = FalkorDBDocumentStore(
     url="bolt://localhost:7687",
-    username="neo4j",
+    username="falkordb",
     password="passw0rd",
-    database="neo4j",
+    database="falkordb",
     embedding_dim=384,
     similarity="cosine",
     recreate_index=True,
@@ -68,4 +68,4 @@ p.connect("embedder.documents", "writer.documents")
 file_paths = [docs_dir / Path(name) for name in os.listdir(docs_dir)]
 result = p.run({"text_file_converter": {"sources": file_paths}})
 
-# Assuming you have a docker container running navigate to http://localhost:7474 to open Neo4j Browser
+# Assuming you have a docker container running navigate to http://localhost:7474 to open FalkorDB Browser
