@@ -19,10 +19,10 @@ HF_TOKEN = Secret.from_env_var("HF_API_TOKEN")
 #     falkordb:5.15.0
 
 client_config = FalkorDBClientConfig(
-    url="bolt://localhost:7687",
+    host="localhost", port=6379,
     username="falkordb",
     password="passw0rd",
-    database="falkordb",
+    graph="haystack",
 )
 
 cypher_query = """

@@ -13,12 +13,12 @@ from haystack.components.embedders import (
     SentenceTransformersDocumentEmbedder,
     SentenceTransformersTextEmbedder,
 )
-from falkordb import Driver, GraphDatabase
+from falkordb import FalkorDB
 
-from falkordb_haystack.client import FalkorDBClientConfig
+from falkordb_haystack.client import FalkorDBClient, FalkorDBClientConfig
 from falkordb_haystack.document_stores import FalkorDBDocumentStore
 
-NEO4J_PORT = 7689
+FALKORDB_PORT = 6379
 EMBEDDING_DIM = 768
 
 logger = logging.getLogger("conftest")
@@ -74,9 +74,9 @@ def _get_free_tcp_port():
     return port
 
 
-def _connection_established(db_driver: Driver) -> bool:
+def _connection_established(config: FalkorDBClientConfig) -> bool:
     """
-    Periodically check falkordb database connectivity and return connection status (:const:`True` if has been established)
+    Periodically check FalkorDB database connectivity and return connection status (:const:`True` if has been established)
     """
     timeout = 120
     stop_time = 3
@@ -84,9 +84,12 @@ def _connection_established(db_driver: Driver) -> bool:
     connection_established = False
     while not connection_established and elapsed_time < timeout:
         try:
-            db_driver.verify_connectivity()
+            client = FalkorDBClient(config)
+            client.verify_connectivity()
+            client.close_driver()
             connection_established = True
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Connection attempt failed: {e}")
             time.sleep(stop_time)
             elapsed_time += stop_time
     return connection_established
@@ -97,42 +100,39 @@ def falkordb_database():
     """
     Starts FalkorDB docker container and waits until FalkorDB database is ready.
     Returns FalkorDB client configuration which represents the database in the docker container.
-    Container is removed after test suite execution. The `scope` is set to ``session`` to keep only one docker
-    container instance fof the whole duration of tests execution to speedup the process.
+    Container is removed after test suite execution. The `scope` is set to ``module`` to keep only one docker
+    container instance for the whole duration of tests execution to speedup the process.
     """
     falkordb_port = _get_free_tcp_port()
-    falkordb_version = os.environ.get("NEO4J_VERSION", "falkordb:5.13.0")
+    falkordb_version = os.environ.get("FALKORDB_VERSION", "falkordb/falkordb:latest")
     falkordb_container = f"test_falkordb_haystack-{falkordb_port}"
+    falkordb_graph = "haystack_test"
 
     config = FalkorDBClientConfig(
-        f"bolt://localhost:{falkordb_port}", database="falkordb", username="falkordb", password="passw0rd"
+        host="localhost",
+        port=falkordb_port,
+        graph=falkordb_graph,
     )
 
     client = docker.from_env()
     container = client.containers.run(
         image=falkordb_version,
         auto_remove=True,
-        environment={
-            "NEO4J_AUTH": f"{config.username}/{config.password}",
-        },
         name=falkordb_container,
-        ports={"7687/tcp": ("127.0.0.1", falkordb_port)},
+        ports={"6379/tcp": ("127.0.0.1", falkordb_port)},
         detach=True,
         remove=True,
     )
 
-    db_driver = GraphDatabase.driver(config.url, database=config.database, auth=config.auth)
+    if not _connection_established(config):
+        pytest.exit("Could not startup FalkorDB docker container and establish connection with database")
 
-    if not _connection_established(db_driver):
-        pytest.exit("Could not startup falkordb docker container and establish connection with database")
-
-    logger.info(f"Started falkordb docker container: {falkordb_container}, image: {falkordb_version}, port: {falkordb_port}")
+    logger.info(f"Started FalkorDB docker container: {falkordb_container}, image: {falkordb_version}, port: {falkordb_port}")
 
     yield config
 
-    logger.info(f"Stopping falkordb docker container: {falkordb_container}")
+    logger.info(f"Stopping FalkorDB docker container: {falkordb_container}")
 
-    db_driver.close()
     container.stop()
 
 
@@ -148,10 +148,9 @@ def doc_store_factory(falkordb_database: FalkorDBClientConfig) -> Callable[..., 
         return FalkorDBDocumentStore(
             **dict(
                 {
-                    "url": falkordb_database.url,
-                    "username": falkordb_database.username,
-                    "password": falkordb_database.password,
-                    "database": falkordb_database.database,
+                    "host": falkordb_database.host,
+                    "port": falkordb_database.port,
+                    "graph": falkordb_database.graph,
                     "embedding_dim": EMBEDDING_DIM,
                     "embedding_field": "embedding",
                     "index": "document-embeddings",

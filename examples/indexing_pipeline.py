@@ -41,10 +41,10 @@ fetch_archive_from_http(
 #     falkordb:5.15.0
 
 document_store = FalkorDBDocumentStore(
-    url="bolt://localhost:7687",
+    host="localhost", port=6379,
     username="falkordb",
     password="passw0rd",
-    database="falkordb",
+    graph="haystack",
     embedding_dim=384,
     similarity="cosine",
     recreate_index=True,

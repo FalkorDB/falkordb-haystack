@@ -16,10 +16,10 @@ from falkordb_haystack.components.falkordb_query_writer import FalkorDBQueryWrit
 #     falkordb:5.16.0
 
 client_config = FalkorDBClientConfig(
-    url="bolt://localhost:7687",
+    host="localhost", port=6379,
     username="falkordb",
     password="passw0rd",
-    database="falkordb",
+    graph="haystack",
 )
 
 pipe = Pipeline()
